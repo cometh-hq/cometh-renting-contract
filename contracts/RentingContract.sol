@@ -30,6 +30,7 @@ contract RentingContract is IRentingContract, ReentrancyGuard {
         address mustAddress,
         address spaceshipsAddress,
         address stakedSpaceShipsAddress,
+        address mustManagerAddress,
         address newLender,
         address newTenant,
         uint256 newEnd,
@@ -44,13 +45,13 @@ contract RentingContract is IRentingContract, ReentrancyGuard {
         end = newEnd;
         percentageForLender = newPercentageForLender;
         IERC721Enumerable(stakedSpaceShips).setApprovalForAll(tenant, true);
+        IERC20(must).approve(mustManagerAddress, 10000000 ether);
     }
 
     function onERC721Received(address, address from, uint256 tokenId, bytes calldata) override external returns(bytes4) {
         require(msg.sender == spaceships || msg.sender == stakedSpaceShips, "invalid nft");
         if((msg.sender == spaceships) && (from == factory)) {
             nftIds.push(tokenId);
-            stake(tokenId, 0);
         }
         return this.onERC721Received.selector;
     }

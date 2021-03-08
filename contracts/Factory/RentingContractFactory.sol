@@ -26,15 +26,18 @@ contract RentingContractFactory is IRentingContractFactory {
     address public spaceships;
     address public stakedSpaceShips;
     address public must;
+    address public mustManager;
 
     constructor(
         address mustAddress,
         address spaceshipsAddress,
-        address stakedSpaceShipsAddress
+        address stakedSpaceShipsAddress,
+        address mustManagerAddress
     ) public {
         must = mustAddress;
         spaceships = spaceshipsAddress;
         stakedSpaceShips = stakedSpaceShipsAddress;
+        mustManager = mustManagerAddress;
     }
 
     function onERC721Received(
@@ -206,6 +209,7 @@ contract RentingContractFactory is IRentingContractFactory {
             must,
             spaceships,
             stakedSpaceShips,
+            mustManager,
             lender,
             tenant,
             end,

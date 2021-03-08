@@ -6,12 +6,13 @@ function requireEnv(name) {
   return v;
 }
 
-module.exports = function (deployer, network) {
+module.exports = async function (deployer, network) {
   if (network != "production") {
     return
   }
   const mustAddress = requireEnv("MUST");
   const spaceshipsAddress = requireEnv("SPACESHIPS");
   const stakedSpaceShipsAddress = requireEnv("STAKED_SPACESHIPS");
-  deployer.deploy(RentingContractFactory, mustAddress, spaceshipsAddress, stakedSpaceShipsAddress);
+  const mustManagerAddress = requireEnv("MUSTMANAGER");
+  deployer.deploy(RentingContractFactory, mustAddress, spaceshipsAddress, stakedSpaceShipsAddress, mustManagerAddress);
 };
