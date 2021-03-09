@@ -3,14 +3,16 @@
 pragma solidity ^0.6.0;
 
 import "./Interface/IStakedSpaceShips.sol";
+import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Enumerable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "./Factory/IRentingContractFactory.sol";
-import "./IRentingContract.sol";
+import "./Factory/ILendingContractFactory.sol";
+import "./ILendingContract.sol";
 
-contract RentingContract is IRentingContract, ReentrancyGuard {
-    uint256[] public override nftIds;
+contract LendingContract is ILendingContract, ReentrancyGuard {
+    using EnumerableSet for EnumerableSet.UintSet;
+
     address public override lender;
     address public override tenant;
     uint256 public override end;
@@ -20,6 +22,8 @@ contract RentingContract is IRentingContract, ReentrancyGuard {
     address public spaceships;
     address public stakedSpaceShips;
     address public must;
+
+    EnumerableSet.UintSet private _nftIds;
 
     modifier lenderOrTenant() {
         require(msg.sender == lender || msg.sender == tenant, "invalid caller");
@@ -33,6 +37,7 @@ contract RentingContract is IRentingContract, ReentrancyGuard {
         address mustManagerAddress,
         address newLender,
         address newTenant,
+        uint256[] memory newNFTIds,
         uint256 newEnd,
         uint256 newPercentageForLender
     ) public {
@@ -40,6 +45,9 @@ contract RentingContract is IRentingContract, ReentrancyGuard {
         spaceships = spaceshipsAddress;
         stakedSpaceShips = stakedSpaceShipsAddress;
         factory = msg.sender;
+        for(uint256 i = 0; i < newNFTIds.length; i++) {
+            _nftIds.add(newNFTIds[i]);
+        }
         lender = newLender;
         tenant = newTenant;
         end = newEnd;
@@ -49,9 +57,9 @@ contract RentingContract is IRentingContract, ReentrancyGuard {
     }
 
     function onERC721Received(address, address from, uint256 tokenId, bytes calldata) override external returns(bytes4) {
-        require(msg.sender == spaceships || msg.sender == stakedSpaceShips, "invalid nft");
+        require(msg.sender == spaceships || msg.sender == stakedSpaceShips, "invalid token");
         if((msg.sender == spaceships) && (from == factory)) {
-            nftIds.push(tokenId);
+            require(_nftIds.contains(tokenId), "invalid token id");
         }
         return this.onERC721Received.selector;
     }
@@ -85,11 +93,19 @@ contract RentingContract is IRentingContract, ReentrancyGuard {
             IStakedSpaceShips(stakedSpaceShips).exit(tokenId, '');
         }
 
-        for(uint256 i = 0; i < nftIds.length; i++) {
-            IERC721Enumerable(spaceships).safeTransferFrom(address(this), lender, nftIds[i]);
+        for(uint256 i = 0; i < _nftIds.length(); i++) {
+            IERC721Enumerable(spaceships).safeTransferFrom(address(this), lender, _nftIds.at(i));
         }
 
-        IRentingContractFactory(factory).closeRentingContract();
+        ILendingContractFactory(factory).closeLending();
+    }
+
+    function nftIds() override external view returns (uint256[] memory) {
+        uint256[] memory result = new uint256[](_nftIds.length());
+        for (uint256 i = 0; i < _nftIds.length(); i++) {
+            result[i] = _nftIds.at(i);
+        }
+        return result;
     }
 
     function _retrieveMust() private {

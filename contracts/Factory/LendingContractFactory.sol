@@ -7,10 +7,10 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
-import "../RentingContract.sol";
-import "./IRentingContractFactory.sol";
+import "../LendingContract.sol";
+import "./ILendingContractFactory.sol";
 
-contract RentingContractFactory is IRentingContractFactory {
+contract LendingContractFactory is ILendingContractFactory {
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSet for EnumerableSet.AddressSet;
     using Counters for Counters.Counter;
@@ -20,8 +20,9 @@ contract RentingContractFactory is IRentingContractFactory {
     mapping(uint256 => Proposal) public proposals;
 
     EnumerableSet.UintSet private _proposalsId;
-    EnumerableSet.AddressSet private _rentContracts;
-    mapping(address => EnumerableSet.AddressSet) private _rentContractsOf;
+    EnumerableSet.AddressSet private _lending;
+    mapping(address => EnumerableSet.AddressSet) private _lendingGrantedOf;
+    mapping(address => EnumerableSet.AddressSet) private _lendingReceivedOf;
 
     address public spaceships;
     address public stakedSpaceShips;
@@ -86,9 +87,10 @@ contract RentingContractFactory is IRentingContractFactory {
 
         _payFixedFee(proposal.lender, proposal.fixedFee);
 
-        address rentingContract = _newRentingContract(
+        address lending = _newLending(
             proposal.lender,
             msg.sender,
+            proposal.nftIds,
             block.timestamp + proposal.duration,
             proposal.percentageForLender
         );
@@ -96,7 +98,7 @@ contract RentingContractFactory is IRentingContractFactory {
         for(uint256 i = 0; i < proposal.nftIds.length; i++) {
             _transfertSpaceShips(
                 address(this),
-                rentingContract,
+                lending,
                 proposal.nftIds[i]
             );
         }
@@ -105,18 +107,22 @@ contract RentingContractFactory is IRentingContractFactory {
             proposalId,
             proposal.lender,
             msg.sender,
-            rentingContract
+            lending
         );
     }
 
-    function closeRentingContract() override external {
-        require(_rentContracts.contains(msg.sender), "unknown rent contract");
-        RentingContract rentingContract = RentingContract(msg.sender);
-        _removeRentingContract(msg.sender, rentingContract.tenant());
-        emit RentingContractClosed(
+    function closeLending() override external {
+        require(_lending.contains(msg.sender), "unknown lending contract");
+        LendingContract lending = LendingContract(msg.sender);
+        _removeLendingContract(
             msg.sender,
-            rentingContract.lender(),
-            rentingContract.tenant()
+            lending.lender(),
+            lending.tenant()
+        );
+        emit LendingContractClosed(
+            msg.sender,
+            lending.lender(),
+            lending.tenant()
         );
     }
 
@@ -124,8 +130,8 @@ contract RentingContractFactory is IRentingContractFactory {
         return _proposalsId.length();
     }
 
-    function rentAmount() override external view returns (uint256) {
-        return _rentContracts.length();
+    function lendingAmount() override external view returns (uint256) {
+        return _lending.length();
     }
 
     function proposalAt(
@@ -134,18 +140,29 @@ contract RentingContractFactory is IRentingContractFactory {
         return proposals[_proposalsId.at(index)];
     }
 
-    function rentAt(uint256 index) override external view returns (address) {
-        address rentContract = _rentContracts.at(index);
-        return rentContract;
+    function lendingAt(uint256 index) override external view returns (address) {
+        address lending = _lending.at(index);
+        return lending;
     }
 
-    function rentOf(
+    function lendingGrantedOf(
+        address lender
+    ) override external view returns (address[] memory) {
+        address[] memory result =
+            new address[](_lendingGrantedOf[lender].length());
+        for (uint256 i = 0; i < _lendingGrantedOf[lender].length(); i++) {
+            result[i] = _lendingGrantedOf[lender].at(i);
+        }
+        return result;
+    }
+
+    function lendingReceivedOf(
         address tenant
     ) override external view returns (address[] memory) {
         address[] memory result =
-            new address[](_rentContractsOf[tenant].length());
-        for (uint256 i = 0; i < _rentContractsOf[tenant].length(); i++) {
-            result[i] = _rentContractsOf[tenant].at(i);
+            new address[](_lendingReceivedOf[tenant].length());
+        for (uint256 i = 0; i < _lendingReceivedOf[tenant].length(); i++) {
+            result[i] = _lendingReceivedOf[tenant].at(i);
         }
         return result;
     }
@@ -199,33 +216,38 @@ contract RentingContractFactory is IRentingContractFactory {
         delete proposals[proposalId];
     }
 
-    function _newRentingContract(
+    function _newLending(
         address lender,
         address tenant,
+        uint256[] memory nftIds,
         uint256 end,
         uint256 percentageForLender
     ) internal returns(address) {
-        RentingContract rentingContract = new RentingContract(
+        LendingContract lending = new LendingContract(
             must,
             spaceships,
             stakedSpaceShips,
             mustManager,
             lender,
             tenant,
+            nftIds,
             end,
             percentageForLender
         );
 
-        _rentContracts.add(address(rentingContract));
-        _rentContractsOf[tenant].add(address(rentingContract));
-        return address(rentingContract);
+        _lending.add(address(lending));
+        _lendingGrantedOf[lender].add(address(lending));
+        _lendingReceivedOf[tenant].add(address(lending));
+        return address(lending);
     }
 
-    function _removeRentingContract(
-        address rentingContract,
+    function _removeLendingContract(
+        address lending,
+        address lender,
         address tenant
     ) internal {
-        _rentContracts.remove(rentingContract);
-        _rentContractsOf[tenant].remove(rentingContract);
+        _lending.remove(lending);
+        _lendingGrantedOf[lender].remove(lending);
+        _lendingReceivedOf[tenant].remove(lending);
     }
 }

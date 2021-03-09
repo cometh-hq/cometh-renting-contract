@@ -1,4 +1,4 @@
-const RentingContractFactory = artifacts.require("RentingContractFactory");
+const LendingContractFactory = artifacts.require("LendingContractFactory");
 
 function requireEnv(name) {
   const v = process.env[name];
@@ -14,5 +14,5 @@ module.exports = async function (deployer, network) {
   const spaceshipsAddress = requireEnv("SPACESHIPS");
   const stakedSpaceShipsAddress = requireEnv("STAKED_SPACESHIPS");
   const mustManagerAddress = requireEnv("MUSTMANAGER");
-  deployer.deploy(RentingContractFactory, mustAddress, spaceshipsAddress, stakedSpaceShipsAddress, mustManagerAddress);
+  deployer.deploy(LendingContractFactory, mustAddress, spaceshipsAddress, stakedSpaceShipsAddress, mustManagerAddress);
 };
