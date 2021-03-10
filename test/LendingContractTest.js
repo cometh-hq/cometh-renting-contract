@@ -44,10 +44,10 @@ contract('LendingContract', function(accounts) {
 
       await factory.acceptProposal(0, { from: bob });
 
-      const bobLendings = await factory.lendingReceivedOf(bob);
+      const bobLendings = await factory.lendingsReceivedOf(bob);
       assert.equal(bobLendings.length, 1);
 
-      const lending = await LendingContract.at(bobLendings[0]);
+      const lending = await LendingContract.at(bobLendings[0].id);
       await lending.stake(firstShip, gameId, { from: bob })
       await lending.stake(secondShip, gameId, { from: bob })
       await lending.stake(thirdShip, gameId, { from: bob })
@@ -62,7 +62,7 @@ contract('LendingContract', function(accounts) {
 
       await factory.acceptProposal(0, { from: bob });
 
-      const bobLendings = await factory.lendingReceivedOf(bob);
+      const bobLendings = await factory.lendingsReceivedOf(bob);
       assert.equal(bobLendings.length, 1);
       assert.equal(await must.balanceOf(bob), 0);
       assert.equal(await must.balanceOf(alice), 1);
@@ -72,7 +72,7 @@ contract('LendingContract', function(accounts) {
       await spaceships.setApprovalForAll(factory.address, true, { from: alice });
       await factory.makeProposal([firstShip], 0, 50, 0, { from: alice });
       await factory.acceptProposal(0, { from: bob });
-      const lending = await LendingContract.at((await factory.lendingReceivedOf(bob))[0]);
+      const lending = await LendingContract.at((await factory.lendingsReceivedOf(bob))[0].id);
 
       // erc20
       const erc20Reward = await TestERC20.new({ from: admin });
@@ -99,7 +99,7 @@ contract('LendingContract', function(accounts) {
       await factory.makeProposal([firstShip, secondShip, thirdShip], 0, 50, 0, { from: alice });
       await factory.acceptProposal(0, { from: bob });
 
-      const lending = await LendingContract.at((await factory.lendingReceivedOf(bob))[0]);
+      const lending = await LendingContract.at((await factory.lendingsReceivedOf(bob))[0].id);
 
       await lending.stake(secondShip, gameId, { from: bob })
       await stakedSpaceShips.exit(secondShip, '0x', { from: bob })
@@ -116,7 +116,7 @@ contract('LendingContract', function(accounts) {
       await factory.makeProposal([firstShip], 0, 50, 0, { from: alice });
       await factory.acceptProposal(0, { from: bob });
 
-      const lending = await LendingContract.at((await factory.lendingReceivedOf(bob))[0]);
+      const lending = await LendingContract.at((await factory.lendingsReceivedOf(bob))[0].id);
 
       await lending.stake(firstShip, gameId, { from: bob })
       await stakedSpaceShips.exit(firstShip, '0x', { from: bob })
@@ -131,7 +131,7 @@ contract('LendingContract', function(accounts) {
       await factory.makeProposal([firstShip], 0, 50, 0, { from: alice });
       await factory.acceptProposal(0, { from: bob });
 
-      const lending = await LendingContract.at((await factory.lendingReceivedOf(bob))[0]);
+      const lending = await LendingContract.at((await factory.lendingsReceivedOf(bob))[0].id);
 
       await lending.stake(firstShip, gameId, { from: bob })
       await stakedSpaceShips.leaveGame(firstShip, { from: bob })
