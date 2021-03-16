@@ -15,9 +15,10 @@ contract LendingContractFactory is ILendingContractFactory {
     using EnumerableSet for EnumerableSet.AddressSet;
     using Counters for Counters.Counter;
 
-    Counters.Counter private _proposalIdTracker;
-    EnumerableSet.UintSet private _proposalsId;
-    mapping(uint256 => Proposal) private _proposals;
+    Counters.Counter private _offerIdTracker;
+    EnumerableSet.UintSet private _offersId;
+    mapping(uint256 => Offer) private _offers;
+    mapping(address => EnumerableSet.UintSet) private _offersOf;
 
     EnumerableSet.AddressSet private _lendings;
     mapping(address => EnumerableSet.AddressSet) private _lendingsGrantedOf;
@@ -50,13 +51,13 @@ contract LendingContractFactory is ILendingContractFactory {
         return this.onERC721Received.selector;
     }
 
-    function makeProposal(
+    function makeOffer(
         uint256[] memory nftIds,
         uint256 duration,
         uint256 percentageForLender,
         uint256 fixedFee
     ) override external {
-        _addProposal(nftIds, duration, percentageForLender, fixedFee);
+        _addOffer(nftIds, duration, percentageForLender, fixedFee);
         for(uint256 i = 0; i < nftIds.length; i++) {
             _transfertSpaceShips(
                 msg.sender,
@@ -66,45 +67,45 @@ contract LendingContractFactory is ILendingContractFactory {
         }
     }
 
-    function removeProposal(uint256 proposalId) override external {
-        require(_proposalsId.contains(proposalId), "unknown proposal");
-        Proposal memory proposal = _proposals[proposalId];
-        for(uint256 i = 0; i < proposal.nftIds.length; i++) {
+    function removeOffer(uint256 offerId) override external {
+        require(_offersId.contains(offerId), "unknown offer");
+        Offer memory offer = _offers[offerId];
+        for(uint256 i = 0; i < offer.nftIds.length; i++) {
             _transfertSpaceShips(
                 address(this),
-                proposal.lender,
-                proposal.nftIds[i]
+                offer.lender,
+                offer.nftIds[i]
             );
         }
-        _removeProposal(proposalId);
-        emit RemovedProposal(proposalId);
+        _removeOffer(offerId, offer.lender);
+        emit OfferRemoved(offerId, offer.lender);
     }
 
-    function acceptProposal(uint256 proposalId) override external {
-        require(_proposalsId.contains(proposalId), "unknown proposal");
-        Proposal memory proposal = _proposals[proposalId];
+    function acceptOffer(uint256 offerId) override external {
+        require(_offersId.contains(offerId), "unknown offer");
+        Offer memory offer = _offers[offerId];
 
-        _payFixedFee(proposal.lender, proposal.fixedFee);
+        _payFixedFee(offer.lender, offer.fixedFee);
 
         address lendingContract = _newLending(
-            proposal.lender,
+            offer.lender,
             msg.sender,
-            proposal.nftIds,
-            block.timestamp + proposal.duration,
-            proposal.percentageForLender
+            offer.nftIds,
+            block.timestamp + offer.duration,
+            offer.percentageForLender
         );
 
-        for(uint256 i = 0; i < proposal.nftIds.length; i++) {
+        for(uint256 i = 0; i < offer.nftIds.length; i++) {
             _transfertSpaceShips(
                 address(this),
                 lendingContract,
-                proposal.nftIds[i]
+                offer.nftIds[i]
             );
         }
-        _removeProposal(proposalId);
-        emit ProposalAccepted(
-            proposalId,
-            proposal.lender,
+        _removeOffer(offerId, offer.lender);
+        emit OfferAccepted(
+            offerId,
+            offer.lender,
             msg.sender,
             lendingContract
         );
@@ -125,25 +126,35 @@ contract LendingContractFactory is ILendingContractFactory {
         );
     }
 
-    function proposalAmount() override external view returns (uint256) {
-        return _proposalsId.length();
+    function offerAmount() override external view returns (uint256) {
+        return _offersId.length();
     }
 
     function lendingAmount() override external view returns (uint256) {
         return _lendings.length();
     }
 
-    function proposalAt(
+    function offerAt(
         uint256 index
-    ) override external view returns (Proposal memory) {
-        return _proposals[_proposalsId.at(index)];
+    ) override external view returns (Offer memory) {
+        return _offers[_offersId.at(index)];
     }
 
-    function proposal(
+    function offer(
         uint256 id
-    ) override external view returns (Proposal memory) {
-        require(_proposalsId.contains(id), "unknown proposal id");
-        return _proposals[id];
+    ) override external view returns (Offer memory) {
+        require(_offersId.contains(id), "unknown offer id");
+        return _offers[id];
+    }
+
+    function offersOf(
+        address lender
+    ) override external view returns (Offer[] memory) {
+        Offer[] memory result = new Offer[](_offersOf[lender].length());
+        for (uint256 i = 0; i < _offersOf[lender].length(); i++) {
+            result[i] = _offers[_offersOf[lender].at(i)];
+        }
+        return result;
     }
 
     function lendingAt(
@@ -188,13 +199,13 @@ contract LendingContractFactory is ILendingContractFactory {
         return result;
     }
 
-    function proposalsPaginated(
+    function offersPaginated(
         uint256 start,
         uint256 amount
-    ) override external view returns (Proposal[] memory) {
-        Proposal[] memory result = new Proposal[](amount);
+    ) override external view returns (Offer[] memory) {
+        Offer[] memory result = new Offer[](amount);
         for (uint256 i = 0; i < amount; i++) {
-            result[i] = _proposals[_proposalsId.at(start + i)];
+            result[i] = _offers[_offersId.at(start + i)];
         }
         return result;
     }
@@ -210,29 +221,30 @@ contract LendingContractFactory is ILendingContractFactory {
         return result;
     }
 
-    function _addProposal(
+    function _addOffer(
         uint256[] memory nftIds,
         uint256 duration,
         uint256 percentageForLender,
         uint256 fixedFee
     ) internal {
-        _proposals[_proposalIdTracker.current()] = Proposal({
-            id: _proposalIdTracker.current(),
+        _offers[_offerIdTracker.current()] = Offer({
+            id: _offerIdTracker.current(),
             nftIds: nftIds,
             lender: msg.sender,
             duration: duration,
             percentageForLender: percentageForLender,
             fixedFee: fixedFee
         });
-        _proposalsId.add(_proposalIdTracker.current());
-        emit NewProposal(
-            _proposalIdTracker.current(),
+        _offersId.add(_offerIdTracker.current());
+        emit OfferNew(
+            _offerIdTracker.current(),
             msg.sender,
             nftIds,
             percentageForLender,
             fixedFee
         );
-        _proposalIdTracker.increment();
+        _offersOf[msg.sender].add(_offerIdTracker.current());
+        _offerIdTracker.increment();
     }
 
     function _payFixedFee(address to, uint256 amount) internal {
@@ -255,9 +267,10 @@ contract LendingContractFactory is ILendingContractFactory {
         );
     }
 
-    function _removeProposal(uint256 proposalId) internal {
-        _proposalsId.remove(proposalId);
-        delete _proposals[proposalId];
+    function _removeOffer(uint256 offerId, address lender) internal {
+        _offersId.remove(offerId);
+        _offersOf[lender].remove(offerId);
+        delete _offers[offerId];
     }
 
     function _newLending(

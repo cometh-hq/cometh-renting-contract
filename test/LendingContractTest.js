@@ -38,11 +38,11 @@ contract('LendingContract', function(accounts) {
   });
 
   describe.only('LendingContract', async () => {
-    it("make and acceptProposal", async function() {
+    it("make and acceptOffer", async function() {
       await spaceships.setApprovalForAll(factory.address, true, { from: alice });
-      await factory.makeProposal([firstShip, secondShip, thirdShip], 0, 50, 0, { from: alice });
+      await factory.makeOffer([firstShip, secondShip, thirdShip], 0, 50, 0, { from: alice });
 
-      await factory.acceptProposal(0, { from: bob });
+      await factory.acceptOffer(0, { from: bob });
 
       const bobLendings = await factory.lendingsReceivedOf(bob);
       assert.equal(bobLendings.length, 1);
@@ -53,14 +53,14 @@ contract('LendingContract', function(accounts) {
       await lending.stake(thirdShip, gameId, { from: bob })
     })
 
-    it("make and acceptProposal with fixed fee", async function() {
+    it("make and acceptOffer with fixed fee", async function() {
       await must.transfer(bob, 1, { from: admin });
       await must.approve(factory.address, 10, { from: bob });
 
       await spaceships.setApprovalForAll(factory.address, true, { from: alice });
-      await factory.makeProposal([firstShip, secondShip, thirdShip], 0, 50, 1, { from: alice });
+      await factory.makeOffer([firstShip, secondShip, thirdShip], 0, 50, 1, { from: alice });
 
-      await factory.acceptProposal(0, { from: bob });
+      await factory.acceptOffer(0, { from: bob });
 
       const bobLendings = await factory.lendingsReceivedOf(bob);
       assert.equal(bobLendings.length, 1);
@@ -68,43 +68,43 @@ contract('LendingContract', function(accounts) {
       assert.equal(await must.balanceOf(alice), 1);
     })
 
-    it("retrieveGains", async function() {
+    it("claim", async function() {
       await spaceships.setApprovalForAll(factory.address, true, { from: alice });
-      await factory.makeProposal([firstShip], 0, 50, 0, { from: alice });
-      await factory.acceptProposal(0, { from: bob });
+      await factory.makeOffer([firstShip], 0, 50, 0, { from: alice });
+      await factory.acceptOffer(0, { from: bob });
       const lending = await LendingContract.at((await factory.lendingsReceivedOf(bob))[0].id);
 
       // erc20
       const erc20Reward = await TestERC20.new({ from: admin });
       await erc20Reward.mint(lending.address, 100, { from: admin });
-      await lending.retrieveGains(erc20Reward.address, { from: alice });
+      await lending.claim(erc20Reward.address, { from: alice });
       assert.equal(await erc20Reward.balanceOf(alice), 50);
       assert.equal(await erc20Reward.balanceOf(bob), 50);
 
       // native
       await web3.eth.sendTransaction({from: admin, to: lending.address, value: 100});
       const bobBalance = await web3.eth.getBalance(bob);
-      await lending.retrieveGains('0x0000000000000000000000000000000000000000', { from: alice });
+      await lending.claim('0x0000000000000000000000000000000000000000', { from: alice });
       const bobNewBalance = await web3.eth.getBalance(bob);
       assert.equal(bobNewBalance, (BigInt(bobBalance) + BigInt(50)).toString());
 
       // must
       await must.transfer(lending.address, 100, { from: admin });
-      await lending.retrieveGains(must.address, { from: alice });
+      await lending.claim(must.address, { from: alice });
       assert.equal(await must.balanceOf(bob), 100);
     })
 
-    it("endContract", async function() {
+    it("close", async function() {
       await spaceships.setApprovalForAll(factory.address, true, { from: alice });
-      await factory.makeProposal([firstShip, secondShip, thirdShip], 0, 50, 0, { from: alice });
-      await factory.acceptProposal(0, { from: bob });
+      await factory.makeOffer([firstShip, secondShip, thirdShip], 0, 50, 0, { from: alice });
+      await factory.acceptOffer(0, { from: bob });
 
       const lending = await LendingContract.at((await factory.lendingsReceivedOf(bob))[0].id);
 
       await lending.stake(secondShip, gameId, { from: bob })
       await stakedSpaceShips.exit(secondShip, '0x', { from: bob })
 
-      await lending.endContract({ from: alice });
+      await lending.close({ from: alice });
 
       assert.equal(await spaceships.ownerOf(firstShip), alice);
       assert.equal(await spaceships.ownerOf(secondShip), alice);
@@ -113,8 +113,8 @@ contract('LendingContract', function(accounts) {
 
     it("can exit and re stake", async function() {
       await spaceships.setApprovalForAll(factory.address, true, { from: alice });
-      await factory.makeProposal([firstShip], 0, 50, 0, { from: alice });
-      await factory.acceptProposal(0, { from: bob });
+      await factory.makeOffer([firstShip], 0, 50, 0, { from: alice });
+      await factory.acceptOffer(0, { from: bob });
 
       const lending = await LendingContract.at((await factory.lendingsReceivedOf(bob))[0].id);
 
@@ -128,8 +128,8 @@ contract('LendingContract', function(accounts) {
 
     it("can leave game and re enter", async function() {
       await spaceships.setApprovalForAll(factory.address, true, { from: alice });
-      await factory.makeProposal([firstShip], 0, 50, 0, { from: alice });
-      await factory.acceptProposal(0, { from: bob });
+      await factory.makeOffer([firstShip], 0, 50, 0, { from: alice });
+      await factory.acceptOffer(0, { from: bob });
 
       const lending = await LendingContract.at((await factory.lendingsReceivedOf(bob))[0].id);
 

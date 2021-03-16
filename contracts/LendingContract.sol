@@ -23,6 +23,8 @@ contract LendingContract is ILendingContract, ReentrancyGuard {
     address public stakedSpaceShips;
     address public must;
 
+    mapping(address => uint256) private _claimed;
+
     EnumerableSet.UintSet private _nftIds;
 
     modifier lenderOrTenant() {
@@ -73,19 +75,30 @@ contract LendingContract is ILendingContract, ReentrancyGuard {
         );
     }
 
-    function retrieveGains(address token) override external nonReentrant lenderOrTenant {
+    function claim(address token) override public nonReentrant lenderOrTenant {
+        uint256 amount;
         if(token == address(0)) {
-            _retrieveNativeGains();
-            return;
+            amount = _retrieveNativeGains();
+        } else if(token == must) {
+            amount = _retrieveMust();
+        } else {
+            amount = _retrieveERC20Gains(token);
         }
-        if(token == must) {
-            _retrieveMust();
-            return;
-        }
-        _retrieveERC20Gains(token);
+        _claimed[token] += amount;
     }
 
-    function endContract() override external lenderOrTenant {
+    function claimBatch(address[] memory tokens) override public nonReentrant lenderOrTenant {
+        for(uint256 i; i < tokens.length; i++) {
+            claim(tokens[i]);
+        }
+    }
+
+    function claimBatchAndClose(address[] memory tokens) override external nonReentrant lenderOrTenant {
+        claimBatch(tokens);
+        close();
+    }
+
+    function close() override public lenderOrTenant {
         require(block.timestamp >= end, "contract unfinished");
         uint256 amountStaked = IERC721Enumerable(stakedSpaceShips).balanceOf(address(this));
         for(uint256 i = 0; i < amountStaked; i++) {
@@ -108,20 +121,30 @@ contract LendingContract is ILendingContract, ReentrancyGuard {
         return result;
     }
 
-    function _retrieveMust() private {
-        IERC20(must).transfer(tenant, IERC20(must).balanceOf(address(this)));
+    function alreadyClaimed(address[] memory tokens) override external view returns(uint256[] memory) {
+        uint256[] memory result = new uint256[](tokens.length);
+        for (uint256 i = 0; i < tokens.length; i++) {
+            result[i] = _claimed[tokens[i]];
+        }
+        return result;
     }
 
-    function _retrieveNativeGains() private {
+    function _retrieveMust() private returns(uint256 amount) {
+        amount = IERC20(must).balanceOf(address(this));
+        IERC20(must).transfer(tenant, amount);
+    }
+
+    function _retrieveNativeGains() private returns(uint256 amount) {
+        amount = address(this).balance;
         payable(lender).transfer(address(this).balance * percentageForLender / 100);
         payable(tenant).transfer(address(this).balance);
     }
 
-    function _retrieveERC20Gains(address token) private {
-        uint256 balance = IERC20(token).balanceOf(address(this));
-        uint256 amountForLender = balance * percentageForLender / 100;
+    function _retrieveERC20Gains(address token) private returns(uint256 amount) {
+        amount = IERC20(token).balanceOf(address(this));
+        uint256 amountForLender = amount * percentageForLender / 100;
         IERC20(token).transfer(lender, amountForLender);
-        IERC20(token).transfer(tenant, balance - amountForLender);
+        IERC20(token).transfer(tenant, amount - amountForLender);
     }
 
     receive() external payable {}
