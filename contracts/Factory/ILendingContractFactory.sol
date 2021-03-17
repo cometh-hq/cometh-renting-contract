@@ -20,6 +20,7 @@ interface ILendingContractFactory is IERC721Receiver{
         uint256[] nftIds;
         address lender;
         address tenant;
+        uint256 start;
         uint256 end;
         uint256 percentageForLender;
     }
@@ -29,9 +30,9 @@ interface ILendingContractFactory is IERC721Receiver{
     event OfferAccepted(uint256 offerId, address lender, address tenant, address lendingContract);
     event LendingContractClosed(address lendingContract, address lender, address tenant);
 
-    function makeOffer(uint256[] memory nftIds, uint256 duration, uint256 percentageForLender, uint256 fixedFee) external;
+    function makeOffer(uint256[] memory nftIds, uint256 duration, uint256 percentageForLender, uint256 fixedFee) external returns (uint256);
     function removeOffer(uint256 offerId) external;
-    function acceptOffer(uint256 offerId) external;
+    function acceptOffer(uint256 offerId) external returns (address);
     function closeLending() external;
 
     function offerAmount() external view returns (uint256);

@@ -56,8 +56,9 @@ contract LendingContractFactory is ILendingContractFactory {
         uint256 duration,
         uint256 percentageForLender,
         uint256 fixedFee
-    ) override external {
-        _addOffer(nftIds, duration, percentageForLender, fixedFee);
+    ) override external returns(uint256 id){
+        require(percentageForLender <= 100, "percentage value over 100%");
+        id = _addOffer(nftIds, duration, percentageForLender, fixedFee);
         for(uint256 i = 0; i < nftIds.length; i++) {
             _transfertSpaceShips(
                 msg.sender,
@@ -81,7 +82,7 @@ contract LendingContractFactory is ILendingContractFactory {
         emit OfferRemoved(offerId, offer.lender);
     }
 
-    function acceptOffer(uint256 offerId) override external {
+    function acceptOffer(uint256 offerId) override external returns(address) {
         require(_offersId.contains(offerId), "unknown offer");
         Offer memory offer = _offers[offerId];
 
@@ -109,6 +110,8 @@ contract LendingContractFactory is ILendingContractFactory {
             msg.sender,
             lendingContract
         );
+
+        return address(lendingContract);
     }
 
     function closeLending() override external {
@@ -172,6 +175,7 @@ contract LendingContractFactory is ILendingContractFactory {
             nftIds: lendingContract.nftIds(),
             lender: lendingContract.lender(),
             tenant: lendingContract.tenant(),
+            start: lendingContract.start(),
             end: lendingContract.end(),
             percentageForLender: lendingContract.percentageForLender()
         });
@@ -226,24 +230,25 @@ contract LendingContractFactory is ILendingContractFactory {
         uint256 duration,
         uint256 percentageForLender,
         uint256 fixedFee
-    ) internal {
-        _offers[_offerIdTracker.current()] = Offer({
-            id: _offerIdTracker.current(),
+    ) internal returns(uint256 id) {
+        id = _offerIdTracker.current();
+        _offers[id] = Offer({
+            id: id,
             nftIds: nftIds,
             lender: msg.sender,
             duration: duration,
             percentageForLender: percentageForLender,
             fixedFee: fixedFee
         });
-        _offersId.add(_offerIdTracker.current());
+        _offersId.add(id);
         emit OfferNew(
-            _offerIdTracker.current(),
+            id,
             msg.sender,
             nftIds,
             percentageForLender,
             fixedFee
         );
-        _offersOf[msg.sender].add(_offerIdTracker.current());
+        _offersOf[msg.sender].add(id);
         _offerIdTracker.increment();
     }
 

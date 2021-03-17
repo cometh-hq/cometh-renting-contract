@@ -14,6 +14,7 @@ interface ILendingContract is IERC721Receiver {
     function nftIds() external view returns(uint256[] memory);
     function lender() external view returns(address);
     function tenant() external view returns(address);
+    function start() external view returns(uint256);
     function end() external view returns(uint256);
     function percentageForLender() external view returns(uint256);
     function alreadyClaimed(address[] memory tokens) external view returns(uint256[] memory);

@@ -94,6 +94,32 @@ contract('LendingContract', function(accounts) {
       assert.equal(await must.balanceOf(bob), 100);
     })
 
+    it("claimBatch", async function() {
+      await spaceships.setApprovalForAll(factory.address, true, { from: alice });
+      await factory.makeOffer([firstShip], 0, 50, 0, { from: alice });
+      await factory.acceptOffer(0, { from: bob });
+      const lending = await LendingContract.at((await factory.lendingsReceivedOf(bob))[0].id);
+
+      // erc20
+      const erc20Reward = await TestERC20.new({ from: admin });
+      await erc20Reward.mint(lending.address, 100, { from: admin });
+
+      // native
+      await web3.eth.sendTransaction({from: admin, to: lending.address, value: 100});
+      const bobBalance = await web3.eth.getBalance(bob);
+
+      // must
+      await must.transfer(lending.address, 100, { from: admin });
+
+      await lending.claimBatch(['0x0000000000000000000000000000000000000000', erc20Reward.address, must.address], { from: alice });
+      const bobNewBalance = await web3.eth.getBalance(bob);
+
+      assert.equal(await must.balanceOf(bob), 100);
+      assert.equal(await erc20Reward.balanceOf(alice), 50);
+      assert.equal(await erc20Reward.balanceOf(bob), 50);
+      assert.equal(bobNewBalance, (BigInt(bobBalance) + BigInt(50)).toString());
+    })
+
     it("close", async function() {
       await spaceships.setApprovalForAll(factory.address, true, { from: alice });
       await factory.makeOffer([firstShip, secondShip, thirdShip], 0, 50, 0, { from: alice });
@@ -109,6 +135,27 @@ contract('LendingContract', function(accounts) {
       assert.equal(await spaceships.ownerOf(firstShip), alice);
       assert.equal(await spaceships.ownerOf(secondShip), alice);
       assert.equal(await spaceships.ownerOf(thirdShip), alice);
+    })
+
+    it("claimBatchAndClose", async function() {
+      await spaceships.setApprovalForAll(factory.address, true, { from: alice });
+      await factory.makeOffer([firstShip], 0, 50, 0, { from: alice });
+      await factory.acceptOffer(0, { from: bob });
+      const lending = await LendingContract.at((await factory.lendingsReceivedOf(bob))[0].id);
+
+      // erc20
+      const erc20Reward = await TestERC20.new({ from: admin });
+      await erc20Reward.mint(lending.address, 100, { from: admin });
+
+      // native
+      await web3.eth.sendTransaction({from: admin, to: lending.address, value: 100});
+      const bobBalance = await web3.eth.getBalance(bob);
+
+      // must
+      await must.transfer(lending.address, 100, { from: admin });
+
+      await lending.claimBatchAndClose(['0x0000000000000000000000000000000000000000', erc20Reward.address, must.address], { from: alice });
+      assert.equal(await spaceships.ownerOf(firstShip), alice);
     })
 
     it("can exit and re stake", async function() {
