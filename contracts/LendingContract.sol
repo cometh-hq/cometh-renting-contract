@@ -94,6 +94,8 @@ contract LendingContract is ILendingContract, ReentrancyGuard {
 
     function close() override public lenderOrTenant {
         require(block.timestamp >= end, "contract unfinished");
+        ILendingContractFactory(factory).closeLending();
+
         uint256 amountStaked = IERC721Enumerable(stakedSpaceShips).balanceOf(address(this));
         for(uint256 i = 0; i < amountStaked; i++) {
             uint256 tokenId = IERC721Enumerable(stakedSpaceShips).tokenOfOwnerByIndex(address(this), 0);
@@ -103,8 +105,6 @@ contract LendingContract is ILendingContract, ReentrancyGuard {
         for(uint256 i = 0; i < _nftIds.length(); i++) {
             IERC721Enumerable(spaceships).safeTransferFrom(address(this), lender, _nftIds.at(i));
         }
-
-        ILendingContractFactory(factory).closeLending();
     }
 
     function nftIds() override external view returns (uint256[] memory) {

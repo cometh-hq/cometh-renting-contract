@@ -24,6 +24,9 @@ contract LendingContractFactory is ILendingContractFactory {
     mapping(address => EnumerableSet.AddressSet) private _lendingsGrantedOf;
     mapping(address => EnumerableSet.AddressSet) private _lendingsReceivedOf;
 
+    uint256 private _leaveFee = 1000000000000000;
+    address private _owner;
+
     address public spaceships;
     address public stakedSpaceShips;
     address public must;
@@ -35,6 +38,7 @@ contract LendingContractFactory is ILendingContractFactory {
         address stakedSpaceShipsAddress,
         address mustManagerAddress
     ) public {
+        _owner = msg.sender;
         must = mustAddress;
         spaceships = spaceshipsAddress;
         stakedSpaceShips = stakedSpaceShipsAddress;
@@ -52,15 +56,16 @@ contract LendingContractFactory is ILendingContractFactory {
     }
 
     function makeOffer(
-        uint256[] memory nftIds,
+        uint256[] calldata nftIds,
         uint256 duration,
         uint256 percentageForLender,
-        uint256 fixedFee
+        uint256 lenderTax
     ) override external returns(uint256 id){
         require(percentageForLender <= 100, "percentage value over 100%");
-        id = _addOffer(nftIds, duration, percentageForLender, fixedFee);
+        uint256 fee = lenderTax + nftIds.length * _leaveFee;
+        id = _addOffer(nftIds, duration, percentageForLender, fee);
         for(uint256 i = 0; i < nftIds.length; i++) {
-            _transfertSpaceShips(
+            _transferSpaceShips(
                 msg.sender,
                 address(this),
                 nftIds[i]
@@ -72,7 +77,7 @@ contract LendingContractFactory is ILendingContractFactory {
         require(_offersId.contains(offerId), "unknown offer");
         Offer memory offer = _offers[offerId];
         for(uint256 i = 0; i < offer.nftIds.length; i++) {
-            _transfertSpaceShips(
+            _transferSpaceShips(
                 address(this),
                 offer.lender,
                 offer.nftIds[i]
@@ -86,7 +91,9 @@ contract LendingContractFactory is ILendingContractFactory {
         require(_offersId.contains(offerId), "unknown offer");
         Offer memory offer = _offers[offerId];
 
-        _payFixedFee(offer.lender, offer.fixedFee);
+        uint256 leaveFee = offer.nftIds.length * _leaveFee;
+        _transferMust(msg.sender, address(this), leaveFee);
+        _transferMust(msg.sender, offer.lender, offer.fee - leaveFee);
 
         address lendingContract = _newLending(
             offer.lender,
@@ -97,7 +104,7 @@ contract LendingContractFactory is ILendingContractFactory {
         );
 
         for(uint256 i = 0; i < offer.nftIds.length; i++) {
-            _transfertSpaceShips(
+            _transferSpaceShips(
                 address(this),
                 lendingContract,
                 offer.nftIds[i]
@@ -117,6 +124,10 @@ contract LendingContractFactory is ILendingContractFactory {
     function closeLending() override external {
         require(_lendings.contains(msg.sender), "unknown lending contract");
         LendingContract lendingContract = LendingContract(msg.sender);
+        IERC20(must).transfer(
+            address(lendingContract),
+            lendingContract.nftIds().length * _leaveFee
+        );
         _removeLending(
             msg.sender,
             lendingContract.lender(),
@@ -129,18 +140,17 @@ contract LendingContractFactory is ILendingContractFactory {
         );
     }
 
+    function updateLeaveFee(uint256 newFee) external override {
+        require(msg.sender == _owner);
+        _leaveFee = newFee;
+    }
+
     function offerAmount() override external view returns (uint256) {
         return _offersId.length();
     }
 
     function lendingAmount() override external view returns (uint256) {
         return _lendings.length();
-    }
-
-    function offerAt(
-        uint256 index
-    ) override external view returns (Offer memory) {
-        return _offers[_offersId.at(index)];
     }
 
     function offer(
@@ -158,13 +168,6 @@ contract LendingContractFactory is ILendingContractFactory {
             result[i] = _offers[_offersOf[lender].at(i)];
         }
         return result;
-    }
-
-    function lendingAt(
-        uint256 index
-    ) override external view returns (Lending memory) {
-        address payable id = payable(_lendings.at(index));
-        return lending(id);
     }
 
     function lending(address id) override public view returns (Lending memory) {
@@ -229,7 +232,7 @@ contract LendingContractFactory is ILendingContractFactory {
         uint256[] memory nftIds,
         uint256 duration,
         uint256 percentageForLender,
-        uint256 fixedFee
+        uint256 fee
     ) internal returns(uint256 id) {
         id = _offerIdTracker.current();
         _offers[id] = Offer({
@@ -238,7 +241,7 @@ contract LendingContractFactory is ILendingContractFactory {
             lender: msg.sender,
             duration: duration,
             percentageForLender: percentageForLender,
-            fixedFee: fixedFee
+            fee: fee
         });
         _offersId.add(id);
         emit OfferNew(
@@ -246,21 +249,21 @@ contract LendingContractFactory is ILendingContractFactory {
             msg.sender,
             nftIds,
             percentageForLender,
-            fixedFee
+            fee
         );
         _offersOf[msg.sender].add(id);
         _offerIdTracker.increment();
     }
 
-    function _payFixedFee(address to, uint256 amount) internal {
+    function _transferMust(address from, address to, uint256 amount) internal {
         IERC20(must).transferFrom(
-            msg.sender,
+            from,
             to,
             amount
         );
     }
 
-    function _transfertSpaceShips(
+    function _transferSpaceShips(
         address from,
         address to,
         uint256 tokenId
