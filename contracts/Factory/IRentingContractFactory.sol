@@ -36,6 +36,7 @@ interface IRentingContractFactory is IERC721Receiver{
     function closeRenting() external;
 
     function updateLeaveFee(uint256 newFee) external;
+    function updateServiceFee(address newFeeReceiver, uint256 newFeePercentage, uint256 newMinFee) external;
 
     function offerAmount() external view returns (uint256);
     function offer(uint256 id) external view returns (Offer memory);

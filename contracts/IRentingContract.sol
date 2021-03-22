@@ -17,5 +17,4 @@ interface IRentingContract is IERC721Receiver {
     function start() external view returns(uint256);
     function end() external view returns(uint256);
     function percentageForLender() external view returns(uint256);
-    function alreadyClaimed(address[] memory tokens) external view returns(uint256[] memory);
 }

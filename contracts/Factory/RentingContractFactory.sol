@@ -32,6 +32,10 @@ contract RentingContractFactory is IRentingContractFactory {
     address public must;
     address public mustManager;
 
+    address public feeReceiver;
+    uint256 public serviceFeePercentage = 5;
+    uint256 public serviceFeeMin = 300000000000000;
+
     constructor(
         address mustAddress,
         address spaceshipsAddress,
@@ -43,6 +47,7 @@ contract RentingContractFactory is IRentingContractFactory {
         spaceships = spaceshipsAddress;
         stakedSpaceShips = stakedSpaceShipsAddress;
         mustManager = mustManagerAddress;
+        feeReceiver = msg.sender;
     }
 
     function onERC721Received(
@@ -61,7 +66,8 @@ contract RentingContractFactory is IRentingContractFactory {
         uint256 percentageForLender,
         uint256 lenderTax
     ) override external returns(uint256 id){
-        require(percentageForLender <= 100, "percentage value over 100%");
+        require(percentageForLender <= 100, "percentage over 100%");
+        require(lenderTax >= serviceFeeMin, "fee too low");
         uint256 fee = lenderTax + nftIds.length * _leaveFee;
         id = _addOffer(nftIds, duration, percentageForLender, fee);
         for(uint256 i = 0; i < nftIds.length; i++) {
@@ -93,7 +99,13 @@ contract RentingContractFactory is IRentingContractFactory {
 
         uint256 leaveFee = offer.nftIds.length * _leaveFee;
         _transferMust(msg.sender, address(this), leaveFee);
-        _transferMust(msg.sender, offer.lender, offer.fee - leaveFee);
+
+        uint256 serviceFee = (offer.fee - leaveFee) * serviceFeePercentage / 100;
+        if (serviceFee < serviceFeeMin) {
+            serviceFee = serviceFeeMin;
+        }
+        _transferMust(msg.sender, feeReceiver, serviceFee);
+        _transferMust(msg.sender, offer.lender, offer.fee - leaveFee - serviceFee);
 
         address rentingContract = _newRenting(
             offer.lender,
@@ -122,7 +134,7 @@ contract RentingContractFactory is IRentingContractFactory {
     }
 
     function closeRenting() override external {
-        require(_rentings.contains(msg.sender), "unknown renting contract");
+        require(_rentings.contains(msg.sender), "unknown renting");
         RentingContract rentingContract = RentingContract(msg.sender);
         IERC20(must).transfer(
             address(rentingContract),
@@ -140,9 +152,19 @@ contract RentingContractFactory is IRentingContractFactory {
         );
     }
 
-    function updateLeaveFee(uint256 newFee) external override {
+    function updateLeaveFee(uint256 newFee) override external {
         require(msg.sender == _owner);
         _leaveFee = newFee;
+    }
+
+    function updateServiceFee(address newFeeReceiver, uint256 newFeePercentage, uint256 newMinFee) override external {
+        require(msg.sender == _owner);
+        if(newFeeReceiver != address(0)) {
+            feeReceiver = newFeeReceiver;
+        }
+        require(newFeePercentage < 100);
+        serviceFeePercentage = newFeePercentage;
+        serviceFeeMin = newMinFee;
     }
 
     function offerAmount() override external view returns (uint256) {
@@ -171,7 +193,7 @@ contract RentingContractFactory is IRentingContractFactory {
     }
 
     function renting(address id) override public view returns (Renting memory) {
-        require(_rentings.contains(id), "unknown renting contract");
+        require(_rentings.contains(id), "unknown renting");
         RentingContract rentingContract = RentingContract(payable(id));
         return Renting({
             id: id,

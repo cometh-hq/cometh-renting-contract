@@ -22,9 +22,7 @@ contract RentingContract is IRentingContract, ReentrancyGuard {
     address public factory;
     address public spaceships;
     address public stakedSpaceShips;
-    address public must;
-
-    mapping(address => uint256) private _claimed;
+    IERC20 public must;
 
     EnumerableSet.UintSet private _nftIds;
 
@@ -44,7 +42,7 @@ contract RentingContract is IRentingContract, ReentrancyGuard {
         uint256 newEnd,
         uint256 newPercentageForLender
     ) public {
-        must = mustAddress;
+        must = IERC20(mustAddress);
         spaceships = spaceshipsAddress;
         stakedSpaceShips = stakedSpaceShipsAddress;
         factory = msg.sender;
@@ -57,13 +55,13 @@ contract RentingContract is IRentingContract, ReentrancyGuard {
         end = newEnd;
         percentageForLender = newPercentageForLender;
         IERC721Enumerable(stakedSpaceShips).setApprovalForAll(tenant, true);
-        IERC20(must).approve(mustManagerAddress, 10000000 ether);
+        must.approve(mustManagerAddress, 10000000 ether);
     }
 
-    function onERC721Received(address, address from, uint256 tokenId, bytes calldata) override external returns(bytes4) {
+    function onERC721Received(address, address from, uint256, bytes calldata) override external returns(bytes4) {
         require(msg.sender == spaceships || msg.sender == stakedSpaceShips, "invalid token");
-        if((msg.sender == spaceships) && (from == factory)) {
-            require(_nftIds.contains(tokenId), "invalid token id");
+        if(msg.sender == spaceships) {
+            require (from == factory || from == stakedSpaceShips, "invalid from");
         }
         return this.onERC721Received.selector;
     }
@@ -93,7 +91,7 @@ contract RentingContract is IRentingContract, ReentrancyGuard {
     }
 
     function close() override public lenderOrTenant {
-        require(block.timestamp >= end, "contract unfinished");
+        require(block.timestamp >= end, "unfinished");
         IRentingContractFactory(factory).closeRenting();
 
         uint256 amountStaked = IERC721Enumerable(stakedSpaceShips).balanceOf(address(this));
@@ -115,20 +113,6 @@ contract RentingContract is IRentingContract, ReentrancyGuard {
         return result;
     }
 
-    function alreadyClaimed(address[] memory tokens) override external view returns(uint256[] memory) {
-        uint256[] memory result = new uint256[](tokens.length);
-        for (uint256 i = 0; i < tokens.length; i++) {
-            result[i] = _claimed[tokens[i]];
-        }
-        return result;
-    }
-
-    function _retrieveMust() private returns(uint256 amount) {
-        amount = IERC20(must).balanceOf(address(this));
-        if(amount == 0) return amount;
-        IERC20(must).transfer(tenant, amount);
-    }
-
     function _retrieveNativeGains() private returns(uint256 amount) {
         amount = address(this).balance;
         if(amount == 0) return amount;
@@ -136,24 +120,24 @@ contract RentingContract is IRentingContract, ReentrancyGuard {
         payable(tenant).transfer(address(this).balance);
     }
 
-    function _retrieveERC20Gains(address token) private returns(uint256 amount) {
-        amount = IERC20(token).balanceOf(address(this));
+    function _retrieveERC20Gains(IERC20 token) private returns(uint256 amount) {
+        amount = token.balanceOf(address(this));
         if(amount == 0) return amount;
-        uint256 amountForLender = amount * percentageForLender / 100;
-        IERC20(token).transfer(lender, amountForLender);
-        IERC20(token).transfer(tenant, amount - amountForLender);
+        if(address(token) != address(must)) {
+            uint256 amountForLender = amount * percentageForLender / 100;
+            token.transfer(lender, amountForLender);
+            amount = amount - amountForLender;
+        }
+        token.transfer(tenant, amount);
     }
 
     function _claim(address token) private {
         uint256 amount;
         if(token == address(0)) {
             amount = _retrieveNativeGains();
-        } else if(token == must) {
-            amount = _retrieveMust();
         } else {
-            amount = _retrieveERC20Gains(token);
+            amount = _retrieveERC20Gains(IERC20(token));
         }
-        _claimed[token] += amount;
     }
 
     function _claimBatch(address[] memory tokens) private {
