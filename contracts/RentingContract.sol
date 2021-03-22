@@ -11,8 +11,6 @@ import "./Factory/IRentingContractFactory.sol";
 import "./IRentingContract.sol";
 
 contract RentingContract is IRentingContract, ReentrancyGuard {
-    using EnumerableSet for EnumerableSet.UintSet;
-
     address public override lender;
     address public override tenant;
     uint256 public override start;
@@ -24,7 +22,10 @@ contract RentingContract is IRentingContract, ReentrancyGuard {
     address public stakedSpaceShips;
     IERC20 public must;
 
-    EnumerableSet.UintSet private _nftIds;
+    uint256[] private _nftIds;
+
+    bool public lenderStop;
+    bool public tenantStop;
 
     modifier lenderOrTenant() {
         require(msg.sender == lender || msg.sender == tenant, "invalid caller");
@@ -46,9 +47,7 @@ contract RentingContract is IRentingContract, ReentrancyGuard {
         spaceships = spaceshipsAddress;
         stakedSpaceShips = stakedSpaceShipsAddress;
         factory = msg.sender;
-        for(uint256 i = 0; i < newNFTIds.length; i++) {
-            _nftIds.add(newNFTIds[i]);
-        }
+        _nftIds = newNFTIds;
         lender = newLender;
         tenant = newTenant;
         start = block.timestamp;
@@ -100,17 +99,19 @@ contract RentingContract is IRentingContract, ReentrancyGuard {
             IStakedSpaceShips(stakedSpaceShips).exit(tokenId, '');
         }
 
-        for(uint256 i = 0; i < _nftIds.length(); i++) {
-            IERC721Enumerable(spaceships).safeTransferFrom(address(this), lender, _nftIds.at(i));
+        for(uint256 i = 0; i < _nftIds.length; i++) {
+            IERC721Enumerable(spaceships).safeTransferFrom(address(this), lender, _nftIds[i]);
         }
     }
 
+    function prematureStop() override external {
+        if(msg.sender == tenant) tenantStop = !tenantStop;
+        if(msg.sender == lender) lenderStop = !lenderStop;
+        if(tenantStop && lenderStop) end = block.timestamp;
+    }
+
     function nftIds() override external view returns (uint256[] memory) {
-        uint256[] memory result = new uint256[](_nftIds.length());
-        for (uint256 i = 0; i < _nftIds.length(); i++) {
-            result[i] = _nftIds.at(i);
-        }
-        return result;
+        return _nftIds;
     }
 
     function _retrieveNativeGains() private returns(uint256 amount) {

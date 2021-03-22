@@ -220,5 +220,21 @@ contract('RentingContract', function(accounts) {
       await stakedSpaceShips.leaveGame(firstShip, { from: bob })
       await stakedSpaceShips.enterGame(gameId, firstShip, { from: bob });
     })
+
+    it.only("prematureStop", async function() {
+      await spaceships.setApprovalForAll(factory.address, true, { from: alice });
+      await factory.makeOffer([firstShip], 1000000, 50, minFee, { from: alice });
+
+      await must.transfer(bob,  1 * leaveFee, { from: admin });
+      await must.approve(factory.address, 1 * leaveFee + minFee, { from: bob });
+
+      await factory.acceptOffer(0, { from: bob });
+
+      const renting = await RentingContract.at((await factory.rentingsReceivedOf(bob))[0].id);
+      renting.prematureStop({ from: bob })
+      renting.prematureStop({ from: alice })
+
+      await renting.close({ from: alice });
+    })
   })
 })

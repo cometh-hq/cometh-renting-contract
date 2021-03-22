@@ -10,6 +10,7 @@ interface IRentingContract is IERC721Receiver {
     function claimBatch(address[] memory tokens) external;
     function claimBatchAndClose(address[] memory tokens) external;
     function close() external;
+    function prematureStop() external;
 
     function nftIds() external view returns(uint256[] memory);
     function lender() external view returns(address);
