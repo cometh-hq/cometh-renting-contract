@@ -7,10 +7,10 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
-import "../LendingContract.sol";
-import "./ILendingContractFactory.sol";
+import "../RentingContract.sol";
+import "./IRentingContractFactory.sol";
 
-contract LendingContractFactory is ILendingContractFactory {
+contract RentingContractFactory is IRentingContractFactory {
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSet for EnumerableSet.AddressSet;
     using Counters for Counters.Counter;
@@ -20,9 +20,9 @@ contract LendingContractFactory is ILendingContractFactory {
     mapping(uint256 => Offer) private _offers;
     mapping(address => EnumerableSet.UintSet) private _offersOf;
 
-    EnumerableSet.AddressSet private _lendings;
-    mapping(address => EnumerableSet.AddressSet) private _lendingsGrantedOf;
-    mapping(address => EnumerableSet.AddressSet) private _lendingsReceivedOf;
+    EnumerableSet.AddressSet private _rentings;
+    mapping(address => EnumerableSet.AddressSet) private _rentingsGrantedOf;
+    mapping(address => EnumerableSet.AddressSet) private _rentingsReceivedOf;
 
     uint256 private _leaveFee = 1000000000000000;
     address private _owner;
@@ -95,7 +95,7 @@ contract LendingContractFactory is ILendingContractFactory {
         _transferMust(msg.sender, address(this), leaveFee);
         _transferMust(msg.sender, offer.lender, offer.fee - leaveFee);
 
-        address lendingContract = _newLending(
+        address rentingContract = _newRenting(
             offer.lender,
             msg.sender,
             offer.nftIds,
@@ -106,7 +106,7 @@ contract LendingContractFactory is ILendingContractFactory {
         for(uint256 i = 0; i < offer.nftIds.length; i++) {
             _transferSpaceShips(
                 address(this),
-                lendingContract,
+                rentingContract,
                 offer.nftIds[i]
             );
         }
@@ -115,28 +115,28 @@ contract LendingContractFactory is ILendingContractFactory {
             offerId,
             offer.lender,
             msg.sender,
-            lendingContract
+            rentingContract
         );
 
-        return address(lendingContract);
+        return address(rentingContract);
     }
 
-    function closeLending() override external {
-        require(_lendings.contains(msg.sender), "unknown lending contract");
-        LendingContract lendingContract = LendingContract(msg.sender);
+    function closeRenting() override external {
+        require(_rentings.contains(msg.sender), "unknown renting contract");
+        RentingContract rentingContract = RentingContract(msg.sender);
         IERC20(must).transfer(
-            address(lendingContract),
-            lendingContract.nftIds().length * _leaveFee
+            address(rentingContract),
+            rentingContract.nftIds().length * _leaveFee
         );
-        _removeLending(
+        _removeRenting(
             msg.sender,
-            lendingContract.lender(),
-            lendingContract.tenant()
+            rentingContract.lender(),
+            rentingContract.tenant()
         );
-        emit LendingContractClosed(
+        emit RentingContractClosed(
             msg.sender,
-            lendingContract.lender(),
-            lendingContract.tenant()
+            rentingContract.lender(),
+            rentingContract.tenant()
         );
     }
 
@@ -149,8 +149,8 @@ contract LendingContractFactory is ILendingContractFactory {
         return _offersId.length();
     }
 
-    function lendingAmount() override external view returns (uint256) {
-        return _lendings.length();
+    function rentingAmount() override external view returns (uint256) {
+        return _rentings.length();
     }
 
     function offer(
@@ -170,38 +170,38 @@ contract LendingContractFactory is ILendingContractFactory {
         return result;
     }
 
-    function lending(address id) override public view returns (Lending memory) {
-        require(_lendings.contains(id), "unknown lending contract");
-        LendingContract lendingContract = LendingContract(payable(id));
-        return Lending({
+    function renting(address id) override public view returns (Renting memory) {
+        require(_rentings.contains(id), "unknown renting contract");
+        RentingContract rentingContract = RentingContract(payable(id));
+        return Renting({
             id: id,
-            nftIds: lendingContract.nftIds(),
-            lender: lendingContract.lender(),
-            tenant: lendingContract.tenant(),
-            start: lendingContract.start(),
-            end: lendingContract.end(),
-            percentageForLender: lendingContract.percentageForLender()
+            nftIds: rentingContract.nftIds(),
+            lender: rentingContract.lender(),
+            tenant: rentingContract.tenant(),
+            start: rentingContract.start(),
+            end: rentingContract.end(),
+            percentageForLender: rentingContract.percentageForLender()
         });
     }
 
-    function lendingsGrantedOf(
+    function rentingsGrantedOf(
         address lender
-    ) override external view returns (Lending[] memory) {
-        Lending[] memory result =
-            new Lending[](_lendingsGrantedOf[lender].length());
-        for (uint256 i = 0; i < _lendingsGrantedOf[lender].length(); i++) {
-            result[i] = lending(_lendingsGrantedOf[lender].at(i));
+    ) override external view returns (Renting[] memory) {
+        Renting[] memory result =
+            new Renting[](_rentingsGrantedOf[lender].length());
+        for (uint256 i = 0; i < _rentingsGrantedOf[lender].length(); i++) {
+            result[i] = renting(_rentingsGrantedOf[lender].at(i));
         }
         return result;
     }
 
-    function lendingsReceivedOf(
+    function rentingsReceivedOf(
         address tenant
-    ) override external view returns (Lending[] memory) {
-        Lending[] memory result =
-            new Lending[](_lendingsReceivedOf[tenant].length());
-        for (uint256 i = 0; i < _lendingsReceivedOf[tenant].length(); i++) {
-            result[i] = lending(_lendingsReceivedOf[tenant].at(i));
+    ) override external view returns (Renting[] memory) {
+        Renting[] memory result =
+            new Renting[](_rentingsReceivedOf[tenant].length());
+        for (uint256 i = 0; i < _rentingsReceivedOf[tenant].length(); i++) {
+            result[i] = renting(_rentingsReceivedOf[tenant].at(i));
         }
         return result;
     }
@@ -217,13 +217,13 @@ contract LendingContractFactory is ILendingContractFactory {
         return result;
     }
 
-    function lendingsPaginated(
+    function rentingsPaginated(
         uint256 start,
         uint256 amount
-     ) override external view returns (Lending[] memory) {
-        Lending[] memory result = new Lending[](amount);
+     ) override external view returns (Renting[] memory) {
+        Renting[] memory result = new Renting[](amount);
         for (uint256 i = 0; i < amount; i++) {
-            result[i] = lending(_lendings.at(start + i));
+            result[i] = renting(_rentings.at(start + i));
         }
         return result;
     }
@@ -281,14 +281,14 @@ contract LendingContractFactory is ILendingContractFactory {
         delete _offers[offerId];
     }
 
-    function _newLending(
+    function _newRenting(
         address lender,
         address tenant,
         uint256[] memory nftIds,
         uint256 end,
         uint256 percentageForLender
     ) internal returns(address) {
-        address lendingContract = address(new LendingContract(
+        address rentingContract = address(new RentingContract(
             must,
             spaceships,
             stakedSpaceShips,
@@ -300,19 +300,19 @@ contract LendingContractFactory is ILendingContractFactory {
             percentageForLender
         ));
 
-        _lendings.add(lendingContract);
-        _lendingsGrantedOf[lender].add(lendingContract);
-        _lendingsReceivedOf[tenant].add(lendingContract);
-        return lendingContract;
+        _rentings.add(rentingContract);
+        _rentingsGrantedOf[lender].add(rentingContract);
+        _rentingsReceivedOf[tenant].add(rentingContract);
+        return rentingContract;
     }
 
-    function _removeLending(
-        address lendingContract,
+    function _removeRenting(
+        address rentingContract,
         address lender,
         address tenant
     ) internal {
-        _lendings.remove(lendingContract);
-        _lendingsGrantedOf[lender].remove(lendingContract);
-        _lendingsReceivedOf[tenant].remove(lendingContract);
+        _rentings.remove(rentingContract);
+        _rentingsGrantedOf[lender].remove(rentingContract);
+        _rentingsReceivedOf[tenant].remove(rentingContract);
     }
 }

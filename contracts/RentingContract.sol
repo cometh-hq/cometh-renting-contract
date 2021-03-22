@@ -7,10 +7,10 @@ import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Enumerable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "./Factory/ILendingContractFactory.sol";
-import "./ILendingContract.sol";
+import "./Factory/IRentingContractFactory.sol";
+import "./IRentingContract.sol";
 
-contract LendingContract is ILendingContract, ReentrancyGuard {
+contract RentingContract is IRentingContract, ReentrancyGuard {
     using EnumerableSet for EnumerableSet.UintSet;
 
     address public override lender;
@@ -94,7 +94,7 @@ contract LendingContract is ILendingContract, ReentrancyGuard {
 
     function close() override public lenderOrTenant {
         require(block.timestamp >= end, "contract unfinished");
-        ILendingContractFactory(factory).closeLending();
+        IRentingContractFactory(factory).closeRenting();
 
         uint256 amountStaked = IERC721Enumerable(stakedSpaceShips).balanceOf(address(this));
         for(uint256 i = 0; i < amountStaked; i++) {

@@ -5,7 +5,7 @@ pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 
-interface ILendingContractFactory is IERC721Receiver{
+interface IRentingContractFactory is IERC721Receiver{
     struct Offer{
         uint256 id;
         uint256[] nftIds;
@@ -15,7 +15,7 @@ interface ILendingContractFactory is IERC721Receiver{
         uint256 fee;
     }
 
-    struct Lending{
+    struct Renting{
         address id;
         uint256[] nftIds;
         address lender;
@@ -27,13 +27,13 @@ interface ILendingContractFactory is IERC721Receiver{
 
     event OfferNew(uint256 offerId, address lender, uint256[] nftIds, uint256 percentageForLender, uint256 fee);
     event OfferRemoved(uint256 offerId, address lender);
-    event OfferAccepted(uint256 offerId, address lender, address tenant, address lendingContract);
-    event LendingContractClosed(address lendingContract, address lender, address tenant);
+    event OfferAccepted(uint256 offerId, address lender, address tenant, address rentingContract);
+    event RentingContractClosed(address rentingContract, address lender, address tenant);
 
     function makeOffer(uint256[] memory nftIds, uint256 duration, uint256 percentageForLender, uint256 fee) external returns (uint256);
     function removeOffer(uint256 offerId) external;
     function acceptOffer(uint256 offerId) external returns (address);
-    function closeLending() external;
+    function closeRenting() external;
 
     function updateLeaveFee(uint256 newFee) external;
 
@@ -42,10 +42,10 @@ interface ILendingContractFactory is IERC721Receiver{
     function offersPaginated(uint256 start, uint256 amount) external view returns (Offer[] memory);
     function offersOf(address lender) external view returns (Offer[] memory);
 
-    function lendingAmount() external view returns (uint256);
-    function lending(address id) external view returns (Lending memory);
-    function lendingsPaginated(uint256 start, uint256 amount) external view returns (Lending[] memory);
+    function rentingAmount() external view returns (uint256);
+    function renting(address id) external view returns (Renting memory);
+    function rentingsPaginated(uint256 start, uint256 amount) external view returns (Renting[] memory);
 
-    function lendingsGrantedOf(address lender) external view returns (Lending[] memory);
-    function lendingsReceivedOf(address tenant) external view returns (Lending[] memory);
+    function rentingsGrantedOf(address lender) external view returns (Renting[] memory);
+    function rentingsReceivedOf(address tenant) external view returns (Renting[] memory);
 }

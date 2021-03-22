@@ -4,7 +4,7 @@ pragma solidity ^0.6.0;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 
-interface ILendingContract is IERC721Receiver {
+interface IRentingContract is IERC721Receiver {
     function stake(uint256 tokenId, uint256 gameId) external;
     function claim(address token) external;
     function claimBatch(address[] memory tokens) external;
