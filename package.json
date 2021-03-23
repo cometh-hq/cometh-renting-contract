@@ -1,0 +1,34 @@
+{
+  "name": "cometh-renting-contract",
+  "version": "1.0.0",
+  "description": "cometh-renting-contract",
+  "main": "truffle-config.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cometh-game/cometh-renting-contract.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/cometh-game/cometh-renting-contract/issues"
+  },
+  "homepage": "https://github.com/cometh-game/cometh-renting-contract#readme",
+  "dependencies": {
+    "@maticnetwork/maticjs": "^2.0.29",
+    "@openzeppelin/contracts": "3.2.0",
+    "@openzeppelin/test-helpers": "^0.5.9",
+    "@poanet/solidity-flattener": "^3.0.6",
+    "@truffle/hdwallet-provider": "^1.2.0",
+    "eth-sig-util": "^3.0.0",
+    "radians-degrees": "^1.0.0",
+    "truffle-contract-size": "^2.0.1",
+    "truffle-flattener": "^1.5.0",
+    "truffle-plugin-verify": "^0.5.2",
+    "truffle-privatekey-provider": "^1.5.0",
+    "wait-for-user-input": "^1.0.0"
+  }
+}

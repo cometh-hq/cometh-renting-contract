@@ -7,7 +7,7 @@ function requireEnv(name) {
 }
 
 module.exports = async function (deployer, network) {
-  if (network != "production") {
+  if (network != "matic") {
     return
   }
   const mustAddress = requireEnv("MUST");
