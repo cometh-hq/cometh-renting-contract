@@ -78,7 +78,7 @@ contract RentingContract is IRentingContract, ReentrancyGuard {
         _claim(token);
     }
 
-    function claimBatch(address[] memory tokens) override public nonReentrant lenderOrTenant {
+    function claimBatch(address[] memory tokens) override external nonReentrant lenderOrTenant {
         for(uint256 i = 0; i < tokens.length; i++) {
             _claim(tokens[i]);
         }
