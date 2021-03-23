@@ -221,7 +221,7 @@ contract('RentingContract', function(accounts) {
       await stakedSpaceShips.enterGame(gameId, firstShip, { from: bob });
     })
 
-    it.only("prematureStop", async function() {
+    it("prematureStop", async function() {
       await spaceships.setApprovalForAll(factory.address, true, { from: alice });
       await factory.makeOffer([firstShip], 1000000, 50, minFee, { from: alice });
 
