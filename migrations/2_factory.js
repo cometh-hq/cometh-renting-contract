@@ -1,3 +1,4 @@
+const assert = require("assert");
 const RentingContractFactory = artifacts.require("RentingContractFactory");
 
 function requireEnv(name) {
