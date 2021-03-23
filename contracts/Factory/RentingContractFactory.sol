@@ -67,6 +67,7 @@ contract RentingContractFactory is IRentingContractFactory {
         uint256 fee
     ) override external returns(uint256 id){
         require(percentageForLender <= 100, "percentage over 100%");
+        require(nftIds.length <= 5, "more than 5 nft");
         uint256 leaveFeeEscrow = nftIds.length * _leaveFee;
         require(fee >= serviceFeeMin + leaveFeeEscrow, "fee too low");
         id = _addOffer(nftIds, duration, percentageForLender, fee);
