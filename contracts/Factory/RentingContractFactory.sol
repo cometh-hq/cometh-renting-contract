@@ -64,11 +64,11 @@ contract RentingContractFactory is IRentingContractFactory {
         uint256[] calldata nftIds,
         uint256 duration,
         uint256 percentageForLender,
-        uint256 lenderTax
+        uint256 fee
     ) override external returns(uint256 id){
         require(percentageForLender <= 100, "percentage over 100%");
-        require(lenderTax >= serviceFeeMin, "fee too low");
-        uint256 fee = lenderTax + nftIds.length * _leaveFee;
+        uint256 leaveFeeEscrow = nftIds.length * _leaveFee;
+        require(fee >= serviceFeeMin + leaveFeeEscrow, "fee too low");
         id = _addOffer(nftIds, duration, percentageForLender, fee);
         for(uint256 i = 0; i < nftIds.length; i++) {
             _transferSpaceShips(

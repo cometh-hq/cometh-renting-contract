@@ -44,7 +44,7 @@ contract('RentingContract', function(accounts) {
   describe('RentingContract', async () => {
     it("make and acceptOffer", async function() {
       await spaceships.setApprovalForAll(factory.address, true, { from: alice });
-      await factory.makeOffer([firstShip, secondShip, thirdShip], 0, 50, minFee, { from: alice });
+      await factory.makeOffer([firstShip, secondShip, thirdShip], 0, 50, minFee + 3 * leaveFee, { from: alice });
 
       await must.transfer(bob,  3 * leaveFee, { from: admin });
       await must.approve(factory.address, 3 * leaveFee + minFee, { from: bob });
@@ -67,7 +67,7 @@ contract('RentingContract', function(accounts) {
       await must.approve(factory.address, 3 * leaveFee + minFee + 1, { from: bob });
 
       await spaceships.setApprovalForAll(factory.address, true, { from: alice });
-      await factory.makeOffer([firstShip, secondShip, thirdShip], 0, 50, minFee + 1, { from: alice });
+      await factory.makeOffer([firstShip, secondShip, thirdShip], 0, 50, minFee + 1 + 3 * leaveFee, { from: alice });
 
       await factory.acceptOffer(0, { from: bob });
 
@@ -79,7 +79,7 @@ contract('RentingContract', function(accounts) {
 
     it("claim", async function() {
       await spaceships.setApprovalForAll(factory.address, true, { from: alice });
-      await factory.makeOffer([firstShip], 0, 50, minFee, { from: alice });
+      await factory.makeOffer([firstShip], 0, 50, minFee + 1 * leaveFee, { from: alice });
 
       await must.transfer(bob,  1 * leaveFee, { from: admin });
       await must.approve(factory.address, 1 * leaveFee + minFee, { from: bob });
@@ -109,7 +109,7 @@ contract('RentingContract', function(accounts) {
 
     it("claimBatch", async function() {
       await spaceships.setApprovalForAll(factory.address, true, { from: alice });
-      await factory.makeOffer([firstShip], 0, 50, minFee, { from: alice });
+      await factory.makeOffer([firstShip], 0, 50, minFee + 1 * leaveFee, { from: alice });
 
       await must.transfer(bob,  1 * leaveFee, { from: admin });
       await must.approve(factory.address, 1 * leaveFee + minFee, { from: bob });
@@ -139,7 +139,7 @@ contract('RentingContract', function(accounts) {
 
     it("close", async function() {
       await spaceships.setApprovalForAll(factory.address, true, { from: alice });
-      await factory.makeOffer([firstShip, secondShip, thirdShip], 0, 50, minFee, { from: alice });
+      await factory.makeOffer([firstShip, secondShip, thirdShip], 0, 50, minFee + 3 * leaveFee, { from: alice });
 
       await must.transfer(bob,  3 * leaveFee, { from: admin });
       await must.approve(factory.address, 3 * leaveFee + minFee, { from: bob });
@@ -161,7 +161,7 @@ contract('RentingContract', function(accounts) {
 
     it("claimBatchAndClose", async function() {
       await spaceships.setApprovalForAll(factory.address, true, { from: alice });
-      await factory.makeOffer([firstShip], 0, 50, minFee, { from: alice });
+      await factory.makeOffer([firstShip], 0, 50, minFee + 1 * leaveFee, { from: alice });
 
       await must.transfer(bob,  1 * leaveFee, { from: admin });
       await must.approve(factory.address, 1 * leaveFee + minFee, { from: bob });
@@ -186,7 +186,7 @@ contract('RentingContract', function(accounts) {
 
     it("can exit and re stake", async function() {
       await spaceships.setApprovalForAll(factory.address, true, { from: alice });
-      await factory.makeOffer([firstShip], 0, 50, minFee, { from: alice });
+      await factory.makeOffer([firstShip], 0, 50, minFee + 1 * leaveFee, { from: alice });
 
       await must.transfer(bob,  1 * leaveFee, { from: admin });
       await must.approve(factory.address, 1 * leaveFee + minFee, { from: bob });
@@ -206,7 +206,7 @@ contract('RentingContract', function(accounts) {
 
     it("can leave game and re enter", async function() {
       await spaceships.setApprovalForAll(factory.address, true, { from: alice });
-      await factory.makeOffer([firstShip], 0, 50, minFee, { from: alice });
+      await factory.makeOffer([firstShip], 0, 50, minFee + 1 * leaveFee, { from: alice });
 
       await must.transfer(bob,  1 * leaveFee, { from: admin });
       await must.approve(factory.address, 1 * leaveFee + minFee, { from: bob });
@@ -223,7 +223,7 @@ contract('RentingContract', function(accounts) {
 
     it("prematureStop", async function() {
       await spaceships.setApprovalForAll(factory.address, true, { from: alice });
-      await factory.makeOffer([firstShip], 1000000, 50, minFee, { from: alice });
+      await factory.makeOffer([firstShip], 1000000, 50, minFee + 1 * leaveFee, { from: alice });
 
       await must.transfer(bob,  1 * leaveFee, { from: admin });
       await must.approve(factory.address, 1 * leaveFee + minFee, { from: bob });
