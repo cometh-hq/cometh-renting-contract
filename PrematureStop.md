@@ -1,4 +1,4 @@
-# Premature close
+# Premature stop
 
 Both parties must do this process.
 
