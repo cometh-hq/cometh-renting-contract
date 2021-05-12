@@ -3,26 +3,26 @@
 pragma solidity ^0.6.0;
 pragma experimental ABIEncoderV2;
 
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
-import "../RentingContract.sol";
+import "./IRentingContract.sol";
 import "./IRentingContractFactory.sol";
+import "./ProxyFactory.sol";
+import "./OfferStore.sol";
+import "./RentalStore.sol";
 
-contract RentingContractFactory is IRentingContractFactory {
+contract RentingManager is IRentingContractFactory, Ownable {
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSet for EnumerableSet.AddressSet;
     using Counters for Counters.Counter;
 
-    Counters.Counter private _offerIdTracker;
-    EnumerableSet.UintSet private _offersId;
-    mapping(uint256 => Offer) private _offers;
-    mapping(address => EnumerableSet.UintSet) private _offersOf;
+    ProxyFactory public proxyFactory;
+    address public rentalImplementation;
 
-    EnumerableSet.AddressSet private _rentings;
-    mapping(address => EnumerableSet.AddressSet) private _rentingsGrantedOf;
-    mapping(address => EnumerableSet.AddressSet) private _rentingsReceivedOf;
+    // EnumerableSet.AddressSet private _rentings;
 
     uint256 private _leaveFee = 1000000000000000;
     address private _owner;
@@ -36,18 +36,29 @@ contract RentingContractFactory is IRentingContractFactory {
     uint256 public serviceFeePercentage = 5;
     uint256 public serviceFeeMin = 300000000000000;
 
+    IOfferStore public offerStore;
+    IRentalStore public rentalStore;
+
     constructor(
         address mustAddress,
         address spaceshipsAddress,
         address stakedSpaceShipsAddress,
-        address mustManagerAddress
+        address mustManagerAddress,
+        ProxyFactory newProxyFactory,
+        address newRentalImplementation,
+        IOfferStore newOfferStore,
+        IRentalStore newRentalStore
     ) public {
+        proxyFactory = newProxyFactory;
+        rentalImplementation = newRentalImplementation;
         _owner = msg.sender;
         must = mustAddress;
         spaceships = spaceshipsAddress;
         stakedSpaceShips = stakedSpaceShipsAddress;
         mustManager = mustManagerAddress;
         feeReceiver = msg.sender;
+        updateOfferStore(newOfferStore);
+        updateRentalStore(newRentalStore);
     }
 
     function onERC721Received(
@@ -81,22 +92,25 @@ contract RentingContractFactory is IRentingContractFactory {
     }
 
     function removeOffer(uint256 offerId) override external {
-        require(_offersId.contains(offerId), "unknown offer");
-        Offer memory offer = _offers[offerId];
-        for(uint256 i = 0; i < offer.nftIds.length; i++) {
+        require(offerStore.contains(offerId), "unknown offer");
+        address lender = offerStore.lender(offerId);
+        require(msg.sender == lender, "caller is not lender");
+
+        uint256[] memory nftIds = offerStore.nftIds(offerId);
+        for(uint256 i = 0; i < nftIds.length; i++) {
             _transferSpaceShips(
                 address(this),
-                offer.lender,
-                offer.nftIds[i]
+                lender,
+                nftIds[i]
             );
         }
-        _removeOffer(offerId, offer.lender);
-        emit OfferRemoved(offerId, offer.lender);
+        _removeOffer(offerId);
+        emit OfferRemoved(offerId, lender);
     }
 
     function acceptOffer(uint256 offerId) override external returns(address) {
-        require(_offersId.contains(offerId), "unknown offer");
-        Offer memory offer = _offers[offerId];
+        require(offerStore.contains(offerId), "unknown offer");
+        Offer memory offer = offer(offerId);
 
         uint256 leaveFee = offer.nftIds.length * _leaveFee;
         _transferMust(msg.sender, address(this), leaveFee);
@@ -123,7 +137,7 @@ contract RentingContractFactory is IRentingContractFactory {
                 offer.nftIds[i]
             );
         }
-        _removeOffer(offerId, offer.lender);
+        _removeOffer(offerId);
         emit OfferAccepted(
             offerId,
             offer.lender,
@@ -131,12 +145,12 @@ contract RentingContractFactory is IRentingContractFactory {
             rentingContract
         );
 
-        return address(rentingContract);
+        return rentingContract;
     }
 
     function closeRenting() override external {
-        require(_rentings.contains(msg.sender), "unknown renting");
-        RentingContract rentingContract = RentingContract(msg.sender);
+        require(rentalStore.contains(msg.sender), "unknown renting");
+        IRentingContract rentingContract = IRentingContract(msg.sender);
         IERC20(must).transfer(
             address(rentingContract),
             rentingContract.nftIds().length * _leaveFee
@@ -153,12 +167,11 @@ contract RentingContractFactory is IRentingContractFactory {
         );
     }
 
-    function updateLeaveFee(uint256 newFee) override external {
-        require(msg.sender == _owner);
+    function updateLeaveFee(uint256 newFee) override external onlyOwner {
         _leaveFee = newFee;
     }
 
-    function updateServiceFee(address newFeeReceiver, uint256 newFeePercentage, uint256 newMinFee) override external {
+    function updateServiceFee(address newFeeReceiver, uint256 newFeePercentage, uint256 newMinFee) override external onlyOwner {
         require(msg.sender == _owner);
         if(newFeeReceiver != address(0)) {
             feeReceiver = newFeeReceiver;
@@ -168,34 +181,63 @@ contract RentingContractFactory is IRentingContractFactory {
         serviceFeeMin = newMinFee;
     }
 
+    function updateOfferStore(IOfferStore newStore)
+        public
+        onlyOwner
+    {
+        offerStore = newStore;
+    }
+
+    function updateRentalStore(IRentalStore newStore)
+        public
+        onlyOwner
+    {
+        rentalStore = newStore;
+    }
+
     function offerAmount() override external view returns (uint256) {
-        return _offersId.length();
+        return offerStore.length();
     }
 
     function rentingAmount() override external view returns (uint256) {
-        return _rentings.length();
+        return rentalStore.length();
     }
 
     function offer(
         uint256 id
-    ) override external view returns (Offer memory) {
-        require(_offersId.contains(id), "unknown offer id");
-        return _offers[id];
+    ) override public view returns (Offer memory) {
+        require(offerStore.contains(id), "unknown offer id");
+        return Offer({
+            id: id,
+            nftIds: offerStore.nftIds(id),
+            lender: offerStore.lender(id),
+            duration: offerStore.duration(id),
+            percentageForLender: offerStore.percentageForLender(id),
+            fee: offerStore.fee(id)
+        });
     }
 
     function offersOf(
         address lender
     ) override external view returns (Offer[] memory) {
-        Offer[] memory result = new Offer[](_offersOf[lender].length());
-        for (uint256 i = 0; i < _offersOf[lender].length(); i++) {
-            result[i] = _offers[_offersOf[lender].at(i)];
+        uint256[] memory ids = offerStore.offersIdsOf(lender);
+        Offer[] memory result = new Offer[](ids.length);
+        for (uint256 i = 0; i < ids.length; i++) {
+            result[i] = Offer({
+                id: ids[i],
+                nftIds: offerStore.nftIds(ids[i]),
+                lender: offerStore.lender(ids[i]),
+                duration: offerStore.duration(ids[i]),
+                percentageForLender: offerStore.percentageForLender(ids[i]),
+                fee: offerStore.fee(ids[i])
+            });
         }
         return result;
     }
 
     function renting(address id) override public view returns (Renting memory) {
-        require(_rentings.contains(id), "unknown renting");
-        RentingContract rentingContract = RentingContract(payable(id));
+        require(rentalStore.contains(id), "unknown renting");
+        IRentingContract rentingContract = IRentingContract(payable(id));
         return Renting({
             id: id,
             nftIds: rentingContract.nftIds(),
@@ -210,10 +252,10 @@ contract RentingContractFactory is IRentingContractFactory {
     function rentingsGrantedOf(
         address lender
     ) override external view returns (Renting[] memory) {
-        Renting[] memory result =
-            new Renting[](_rentingsGrantedOf[lender].length());
-        for (uint256 i = 0; i < _rentingsGrantedOf[lender].length(); i++) {
-            result[i] = renting(_rentingsGrantedOf[lender].at(i));
+        address[] memory ids = rentalStore.rentalsIdsGrantedOf(lender);
+        Renting[] memory result = new Renting[](ids.length);
+        for (uint256 i = 0; i < ids.length; i++) {
+            result[i] = renting(ids[i]);
         }
         return result;
     }
@@ -221,10 +263,10 @@ contract RentingContractFactory is IRentingContractFactory {
     function rentingsReceivedOf(
         address tenant
     ) override external view returns (Renting[] memory) {
-        Renting[] memory result =
-            new Renting[](_rentingsReceivedOf[tenant].length());
-        for (uint256 i = 0; i < _rentingsReceivedOf[tenant].length(); i++) {
-            result[i] = renting(_rentingsReceivedOf[tenant].at(i));
+        address[] memory ids = rentalStore.rentalsIdsReceivedOf(tenant);
+        Renting[] memory result = new Renting[](ids.length);
+        for (uint256 i = 0; i < ids.length; i++) {
+            result[i] = renting(ids[i]);
         }
         return result;
     }
@@ -235,7 +277,7 @@ contract RentingContractFactory is IRentingContractFactory {
     ) override external view returns (Offer[] memory) {
         Offer[] memory result = new Offer[](amount);
         for (uint256 i = 0; i < amount; i++) {
-            result[i] = _offers[_offersId.at(start + i)];
+            result[i] = offer(offerStore.idAt(start + i));
         }
         return result;
     }
@@ -243,10 +285,10 @@ contract RentingContractFactory is IRentingContractFactory {
     function rentingsPaginated(
         uint256 start,
         uint256 amount
-     ) override external view returns (Renting[] memory) {
+    ) override external view returns (Renting[] memory) {
         Renting[] memory result = new Renting[](amount);
         for (uint256 i = 0; i < amount; i++) {
-            result[i] = renting(_rentings.at(start + i));
+            result[i] = renting(rentalStore.idAt(start + i));
         }
         return result;
     }
@@ -257,16 +299,13 @@ contract RentingContractFactory is IRentingContractFactory {
         uint256 percentageForLender,
         uint256 fee
     ) internal returns(uint256 id) {
-        id = _offerIdTracker.current();
-        _offers[id] = Offer({
-            id: id,
-            nftIds: nftIds,
-            lender: msg.sender,
-            duration: duration,
-            percentageForLender: percentageForLender,
-            fee: fee
-        });
-        _offersId.add(id);
+        id = offerStore.add(
+            nftIds,
+            msg.sender,
+            duration,
+            percentageForLender,
+            fee
+        );
         emit OfferNew(
             id,
             msg.sender,
@@ -274,8 +313,6 @@ contract RentingContractFactory is IRentingContractFactory {
             percentageForLender,
             fee
         );
-        _offersOf[msg.sender].add(id);
-        _offerIdTracker.increment();
     }
 
     function _transferMust(address from, address to, uint256 amount) internal {
@@ -298,10 +335,8 @@ contract RentingContractFactory is IRentingContractFactory {
         );
     }
 
-    function _removeOffer(uint256 offerId, address lender) internal {
-        _offersId.remove(offerId);
-        _offersOf[lender].remove(offerId);
-        delete _offers[offerId];
+    function _removeOffer(uint256 offerId) internal {
+        offerStore.remove(offerId);
     }
 
     function _newRenting(
@@ -311,7 +346,8 @@ contract RentingContractFactory is IRentingContractFactory {
         uint256 end,
         uint256 percentageForLender
     ) internal returns(address) {
-        address rentingContract = address(new RentingContract(
+        bytes memory data = abi.encodeWithSelector(
+            0x26f8a3e1,
             must,
             spaceships,
             stakedSpaceShips,
@@ -320,12 +356,11 @@ contract RentingContractFactory is IRentingContractFactory {
             tenant,
             nftIds,
             end,
-            percentageForLender
-        ));
-
-        _rentings.add(rentingContract);
-        _rentingsGrantedOf[lender].add(rentingContract);
-        _rentingsReceivedOf[tenant].add(rentingContract);
+            percentageForLender,
+            address(this)
+        );
+        address rentingContract = address(proxyFactory.createProxy(rentalImplementation, data));
+        rentalStore.add(rentingContract, lender, tenant);
         return rentingContract;
     }
 
@@ -334,8 +369,6 @@ contract RentingContractFactory is IRentingContractFactory {
         address lender,
         address tenant
     ) internal {
-        _rentings.remove(rentingContract);
-        _rentingsGrantedOf[lender].remove(rentingContract);
-        _rentingsReceivedOf[tenant].remove(rentingContract);
+        rentalStore.remove(rentingContract, lender, tenant);
     }
 }

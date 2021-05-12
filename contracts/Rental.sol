@@ -7,10 +7,11 @@ import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Enumerable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "./Factory/IRentingContractFactory.sol";
+import "./IRentingContractFactory.sol";
 import "./IRentingContract.sol";
+import "./Implementation.sol";
 
-contract RentingContract is IRentingContract, ReentrancyGuard {
+contract Rental is Implementation, IRentingContract, ReentrancyGuard {
     address public override lender;
     address public override tenant;
     uint256 public override start;
@@ -26,6 +27,8 @@ contract RentingContract is IRentingContract, ReentrancyGuard {
 
     bool public lenderStop;
     bool public tenantStop;
+
+    bool private _initialized;
 
     modifier lenderOrTenant() {
         require(msg.sender == lender || msg.sender == tenant, "invalid caller");
@@ -43,10 +46,38 @@ contract RentingContract is IRentingContract, ReentrancyGuard {
         uint256 newEnd,
         uint256 newPercentageForLender
     ) public {
+        initialize(mustAddress,
+            spaceshipsAddress,
+            stakedSpaceShipsAddress,
+            mustManagerAddress,
+            newLender,
+            newTenant,
+            newNFTIds,
+            newEnd,
+            newPercentageForLender,
+            msg.sender
+        );
+    }
+
+    function initialize(
+        address mustAddress,
+        address spaceshipsAddress,
+        address stakedSpaceShipsAddress,
+        address mustManagerAddress,
+        address newLender,
+        address newTenant,
+        uint256[] memory newNFTIds,
+        uint256 newEnd,
+        uint256 newPercentageForLender,
+        address factoryAddress
+    ) public {
+        require(!_initialized, "Contract already initialized");
+        _initialized = true;
+
         must = IERC20(mustAddress);
         spaceships = spaceshipsAddress;
         stakedSpaceShips = stakedSpaceShipsAddress;
-        factory = msg.sender;
+        factory = factoryAddress;
         _nftIds = newNFTIds;
         lender = newLender;
         tenant = newTenant;

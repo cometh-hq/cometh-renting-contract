@@ -1,9 +1,15 @@
-const RentingContractFactory = artifacts.require("RentingContractFactory")
+const RentingManager = artifacts.require("RentingManager")
 const RentingContract = artifacts.require("RentingContract")
 const StakedSpaceShips = artifacts.require("StakedSpaceShips");
 const TestERC721 = artifacts.require("TestERC721")
 const TestERC20 = artifacts.require("TestERC20")
 const FakeGame = artifacts.require("FakeGame")
+const Rental = artifacts.require("Rental")
+const ProxyFactory = artifacts.require("ProxyFactory")
+const OfferStore = artifacts.require("OfferStore")
+const RentalStore = artifacts.require("RentalStore")
+
+const { assertRevertWith } = require('./utils');
 
 contract('RentingContract', function(accounts) {
   const admin = accounts[0];
@@ -13,11 +19,16 @@ contract('RentingContract', function(accounts) {
   let stakedSpaceShips;
   let game;
   let must;
+  let offerStore;
+  let rentalStore;
 
   const gameId = 1;
   const firstShip = 0
   const secondShip = 1
   const thirdShip = 2
+  const fourthShip = 3
+  const fithShip = 4
+  const sixShip = 5
 
   const leaveFee = 1000000000000000;
   const minFee = 300000000000000;
@@ -30,18 +41,62 @@ contract('RentingContract', function(accounts) {
     stakedSpaceShips = await StakedSpaceShips.new("uri", spaceships.address, { from: admin });
 
     game = await FakeGame.new(must.address, stakedSpaceShips.address);
-
     await stakedSpaceShips.updateGames(gameId, game.address)
 
     await spaceships.mint(alice, { from: admin });
     await spaceships.mint(alice, { from: admin });
     await spaceships.mint(alice, { from: admin });
 
-    factory = await RentingContractFactory.new(must.address, spaceships.address, stakedSpaceShips.address, game.address);
+    const proxyFactory = await ProxyFactory.new()
+
+    const impl = await Rental.new(
+      must.address,
+      spaceships.address,
+      stakedSpaceShips.address,
+      game.address,
+      '0x0000000000000000000000000000000000000000',
+      '0x0000000000000000000000000000000000000000',
+      [],
+      0,
+      0
+    )
+    offerStore = await OfferStore.new()
+    rentalStore = await RentalStore.new()
+    factory = await RentingManager.new(
+      must.address,
+      spaceships.address,
+      stakedSpaceShips.address,
+      game.address,
+      proxyFactory.address,
+      impl.address,
+      offerStore.address,
+      rentalStore.address
+    );
+
+    await offerStore.updateModule(factory.address)
+    await rentalStore.updateModule(factory.address)
+    // address mustAddress,
+    // address spaceshipsAddress,
+    // address stakedSpaceShipsAddress,
+    // address mustManagerAddress,
+
+    // ProxyFactory newProxyFactory,
+    // address newRentalImplementation,
+    // IOfferStore newOfferStore,
+    // IRentalStore newRentalStore
+
     await must.transfer(bob, minFee, { from: admin });
   });
 
   describe('RentingContract', async () => {
+    it("make offer over 5 ships", async function() {
+      await spaceships.setApprovalForAll(factory.address, true, { from: alice });
+      await assertRevertWith(
+        factory.makeOffer([firstShip, secondShip, thirdShip, fourthShip, fithShip, sixShip], 0, 50, minFee + 6 * leaveFee, { from: alice }),
+        "more than 5 nft"
+      )
+    })
+
     it("make and acceptOffer", async function() {
       await spaceships.setApprovalForAll(factory.address, true, { from: alice });
       await factory.makeOffer([firstShip, secondShip, thirdShip], 0, 50, minFee + 3 * leaveFee, { from: alice });
