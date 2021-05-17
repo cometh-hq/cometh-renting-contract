@@ -13,7 +13,8 @@ interface IOfferStore {
         address lender,
         uint256 duration,
         uint256 percentageForLender,
-        uint256 fee
+        uint256 fee,
+        address privateFor
     ) external returns (uint256);
 
     function remove(uint256 cometId) external;
@@ -36,6 +37,8 @@ interface IOfferStore {
 
     function fee(uint256 offerId) external view returns (uint256);
 
+    function privateFor(uint256 offerId) external view returns (address);
+
     function offersIdsOf(address account) external view returns (uint256[] memory);
 }
 
@@ -50,6 +53,7 @@ contract OfferStore is IOfferStore, Modulable {
     mapping(uint256 => uint256) internal _durations;
     mapping(uint256 => uint256) internal _percentageForLenders;
     mapping(uint256 => uint256) internal _fees;
+    mapping(uint256 => address) internal _privateFor;
 
     mapping(address => EnumerableSet.UintSet) internal _offersIdsOf;
 
@@ -60,7 +64,8 @@ contract OfferStore is IOfferStore, Modulable {
         address lender,
         uint256 duration,
         uint256 percentageForLender,
-        uint256 fee
+        uint256 fee,
+        address privateFor
     ) external override onlyModule returns (uint256) {
         uint256 id = currentId;
         require(_offerIds.add(id), "Store: already exist");
@@ -69,6 +74,7 @@ contract OfferStore is IOfferStore, Modulable {
         _durations[id] = duration;
         _percentageForLenders[id] = percentageForLender;
         _fees[id] = fee;
+        _privateFor[id] = privateFor;
         _offersIdsOf[lender].add(id);
         currentId++;
         return id;
@@ -147,6 +153,15 @@ contract OfferStore is IOfferStore, Modulable {
         returns (uint256)
     {
         return _fees[offerId];
+    }
+
+    function privateFor(uint256 offerId)
+        external
+        view
+        override
+        returns (address)
+    {
+        return _privateFor[offerId];
     }
 
     function offersIdsOf(address account)

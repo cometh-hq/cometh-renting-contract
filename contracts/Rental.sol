@@ -7,11 +7,11 @@ import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Enumerable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "./IRentingContractFactory.sol";
-import "./IRentingContract.sol";
+import "./IRentalManager.sol";
+import "./IRental.sol";
 import "./Implementation.sol";
 
-contract Rental is Implementation, IRentingContract, ReentrancyGuard {
+contract Rental is Implementation, IRental, ReentrancyGuard {
     address public override lender;
     address public override tenant;
     uint256 public override start;
@@ -122,7 +122,7 @@ contract Rental is Implementation, IRentingContract, ReentrancyGuard {
 
     function close() override public lenderOrTenant {
         require(block.timestamp >= end, "unfinished");
-        IRentingContractFactory(factory).closeRenting();
+        IRentalManager(factory).closeRenting();
 
         uint256 amountStaked = IERC721Enumerable(stakedSpaceShips).balanceOf(address(this));
         for(uint256 i = 0; i < amountStaked; i++) {

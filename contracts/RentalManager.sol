@@ -6,23 +6,15 @@ pragma experimental ABIEncoderV2;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/utils/EnumerableSet.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
-import "./IRentingContract.sol";
-import "./IRentingContractFactory.sol";
+import "./IRental.sol";
+import "./IRentalManager.sol";
 import "./ProxyFactory.sol";
 import "./OfferStore.sol";
 import "./RentalStore.sol";
 
-contract RentingManager is IRentingContractFactory, Ownable {
-    using EnumerableSet for EnumerableSet.UintSet;
-    using EnumerableSet for EnumerableSet.AddressSet;
-    using Counters for Counters.Counter;
-
+contract RentalManager is IRentalManager, Ownable {
     ProxyFactory public proxyFactory;
     address public rentalImplementation;
-
-    // EnumerableSet.AddressSet private _rentings;
 
     uint256 private _leaveFee = 1000000000000000;
     address private _owner;
@@ -75,13 +67,14 @@ contract RentingManager is IRentingContractFactory, Ownable {
         uint256[] calldata nftIds,
         uint256 duration,
         uint256 percentageForLender,
-        uint256 fee
+        uint256 fee,
+        address privateFor
     ) override external returns(uint256 id){
         require(percentageForLender <= 100, "percentage over 100%");
         require(nftIds.length <= 5, "more than 5 nft");
         uint256 leaveFeeEscrow = nftIds.length * _leaveFee;
         require(fee >= serviceFeeMin + leaveFeeEscrow, "fee too low");
-        id = _addOffer(nftIds, duration, percentageForLender, fee);
+        id = _addOffer(nftIds, duration, percentageForLender, fee, privateFor);
         for(uint256 i = 0; i < nftIds.length; i++) {
             _transferSpaceShips(
                 msg.sender,
@@ -111,6 +104,7 @@ contract RentingManager is IRentingContractFactory, Ownable {
     function acceptOffer(uint256 offerId) override external returns(address) {
         require(offerStore.contains(offerId), "unknown offer");
         Offer memory offer = offer(offerId);
+        require(offer.privateFor == address(0) || offer.privateFor == msg.sender, "invalid sender");
 
         uint256 leaveFee = offer.nftIds.length * _leaveFee;
         _transferMust(msg.sender, address(this), leaveFee);
@@ -150,7 +144,7 @@ contract RentingManager is IRentingContractFactory, Ownable {
 
     function closeRenting() override external {
         require(rentalStore.contains(msg.sender), "unknown renting");
-        IRentingContract rentingContract = IRentingContract(msg.sender);
+        IRental rentingContract = IRental(msg.sender);
         IERC20(must).transfer(
             address(rentingContract),
             rentingContract.nftIds().length * _leaveFee
@@ -213,7 +207,8 @@ contract RentingManager is IRentingContractFactory, Ownable {
             lender: offerStore.lender(id),
             duration: offerStore.duration(id),
             percentageForLender: offerStore.percentageForLender(id),
-            fee: offerStore.fee(id)
+            fee: offerStore.fee(id),
+            privateFor: offerStore.privateFor(id)
         });
     }
 
@@ -223,21 +218,14 @@ contract RentingManager is IRentingContractFactory, Ownable {
         uint256[] memory ids = offerStore.offersIdsOf(lender);
         Offer[] memory result = new Offer[](ids.length);
         for (uint256 i = 0; i < ids.length; i++) {
-            result[i] = Offer({
-                id: ids[i],
-                nftIds: offerStore.nftIds(ids[i]),
-                lender: offerStore.lender(ids[i]),
-                duration: offerStore.duration(ids[i]),
-                percentageForLender: offerStore.percentageForLender(ids[i]),
-                fee: offerStore.fee(ids[i])
-            });
+            result[i] = offer(ids[i]);
         }
         return result;
     }
 
     function renting(address id) override public view returns (Renting memory) {
         require(rentalStore.contains(id), "unknown renting");
-        IRentingContract rentingContract = IRentingContract(payable(id));
+        IRental rentingContract = IRental(payable(id));
         return Renting({
             id: id,
             nftIds: rentingContract.nftIds(),
@@ -297,21 +285,24 @@ contract RentingManager is IRentingContractFactory, Ownable {
         uint256[] memory nftIds,
         uint256 duration,
         uint256 percentageForLender,
-        uint256 fee
+        uint256 fee,
+        address privateFor
     ) internal returns(uint256 id) {
         id = offerStore.add(
             nftIds,
             msg.sender,
             duration,
             percentageForLender,
-            fee
+            fee,
+            privateFor
         );
         emit OfferNew(
             id,
             msg.sender,
             nftIds,
             percentageForLender,
-            fee
+            fee,
+            privateFor
         );
     }
 
