@@ -100,7 +100,7 @@ contract Rental is Implementation, IRental, ReentrancyGuard {
 
     function close() override public lenderOrTenant {
         require(block.timestamp >= end, "unfinished");
-        IRentalManager(factory).closeRenting();
+        IRentalManager(factory).closeRental();
 
         uint256 amountStaked = IERC721Enumerable(stakedSpaceShips).balanceOf(address(this));
         for(uint256 i = 0; i < amountStaked; i++) {

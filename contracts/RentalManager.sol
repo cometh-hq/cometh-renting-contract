@@ -116,7 +116,7 @@ contract RentalManager is IRentalManager, Ownable {
         _transferMust(msg.sender, feeReceiver, serviceFee);
         _transferMust(msg.sender, offer.lender, offer.fee - leaveFee - serviceFee);
 
-        address rentingContract = _newRenting(
+        address rentalContract = _newRental(
             offer.lender,
             msg.sender,
             offer.nftIds,
@@ -127,7 +127,7 @@ contract RentalManager is IRentalManager, Ownable {
         for(uint256 i = 0; i < offer.nftIds.length; i++) {
             _transferSpaceShips(
                 address(this),
-                rentingContract,
+                rentalContract,
                 offer.nftIds[i]
             );
         }
@@ -136,28 +136,28 @@ contract RentalManager is IRentalManager, Ownable {
             offerId,
             offer.lender,
             msg.sender,
-            rentingContract
+            rentalContract
         );
 
-        return rentingContract;
+        return rentalContract;
     }
 
-    function closeRenting() override external {
-        require(rentalStore.contains(msg.sender), "unknown renting");
-        IRental rentingContract = IRental(msg.sender);
+    function closeRental() override external {
+        require(rentalStore.contains(msg.sender), "unknown rental");
+        IRental rentalContract = IRental(msg.sender);
         IERC20(must).transfer(
-            address(rentingContract),
-            rentingContract.nftIds().length * _leaveFee
+            address(rentalContract),
+            rentalContract.nftIds().length * _leaveFee
         );
-        _removeRenting(
+        _removeRental(
             msg.sender,
-            rentingContract.lender(),
-            rentingContract.tenant()
+            rentalContract.lender(),
+            rentalContract.tenant()
         );
-        emit RentingContractClosed(
+        emit RentalContractClosed(
             msg.sender,
-            rentingContract.lender(),
-            rentingContract.tenant()
+            rentalContract.lender(),
+            rentalContract.tenant()
         );
     }
 
@@ -193,7 +193,7 @@ contract RentalManager is IRentalManager, Ownable {
         return offerStore.length();
     }
 
-    function rentingAmount() override external view returns (uint256) {
+    function rentalAmount() override external view returns (uint256) {
         return rentalStore.length();
     }
 
@@ -223,38 +223,38 @@ contract RentalManager is IRentalManager, Ownable {
         return result;
     }
 
-    function renting(address id) override public view returns (Renting memory) {
-        require(rentalStore.contains(id), "unknown renting");
-        IRental rentingContract = IRental(payable(id));
-        return Renting({
+    function rental(address id) override public view returns (Rental memory) {
+        require(rentalStore.contains(id), "unknown rental");
+        IRental rentalContract = IRental(payable(id));
+        return Rental({
             id: id,
-            nftIds: rentingContract.nftIds(),
-            lender: rentingContract.lender(),
-            tenant: rentingContract.tenant(),
-            start: rentingContract.start(),
-            end: rentingContract.end(),
-            percentageForLender: rentingContract.percentageForLender()
+            nftIds: rentalContract.nftIds(),
+            lender: rentalContract.lender(),
+            tenant: rentalContract.tenant(),
+            start: rentalContract.start(),
+            end: rentalContract.end(),
+            percentageForLender: rentalContract.percentageForLender()
         });
     }
 
-    function rentingsGrantedOf(
+    function rentalsGrantedOf(
         address lender
-    ) override external view returns (Renting[] memory) {
+    ) override external view returns (Rental[] memory) {
         address[] memory ids = rentalStore.rentalsIdsGrantedOf(lender);
-        Renting[] memory result = new Renting[](ids.length);
+        Rental[] memory result = new Rental[](ids.length);
         for (uint256 i = 0; i < ids.length; i++) {
-            result[i] = renting(ids[i]);
+            result[i] = rental(ids[i]);
         }
         return result;
     }
 
-    function rentingsReceivedOf(
+    function rentalsReceivedOf(
         address tenant
-    ) override external view returns (Renting[] memory) {
+    ) override external view returns (Rental[] memory) {
         address[] memory ids = rentalStore.rentalsIdsReceivedOf(tenant);
-        Renting[] memory result = new Renting[](ids.length);
+        Rental[] memory result = new Rental[](ids.length);
         for (uint256 i = 0; i < ids.length; i++) {
-            result[i] = renting(ids[i]);
+            result[i] = rental(ids[i]);
         }
         return result;
     }
@@ -270,13 +270,13 @@ contract RentalManager is IRentalManager, Ownable {
         return result;
     }
 
-    function rentingsPaginated(
+    function rentalsPaginated(
         uint256 start,
         uint256 amount
-    ) override external view returns (Renting[] memory) {
-        Renting[] memory result = new Renting[](amount);
+    ) override external view returns (Rental[] memory) {
+        Rental[] memory result = new Rental[](amount);
         for (uint256 i = 0; i < amount; i++) {
-            result[i] = renting(rentalStore.idAt(start + i));
+            result[i] = rental(rentalStore.idAt(start + i));
         }
         return result;
     }
@@ -330,7 +330,7 @@ contract RentalManager is IRentalManager, Ownable {
         offerStore.remove(offerId);
     }
 
-    function _newRenting(
+    function _newRental(
         address lender,
         address tenant,
         uint256[] memory nftIds,
@@ -350,16 +350,16 @@ contract RentalManager is IRentalManager, Ownable {
             percentageForLender,
             address(this)
         );
-        address rentingContract = address(proxyFactory.createProxy(rentalImplementation, data));
-        rentalStore.add(rentingContract, lender, tenant);
-        return rentingContract;
+        address rentalContract = address(proxyFactory.createProxy(rentalImplementation, data));
+        rentalStore.add(rentalContract, lender, tenant);
+        return rentalContract;
     }
 
-    function _removeRenting(
-        address rentingContract,
+    function _removeRental(
+        address rentalContract,
         address lender,
         address tenant
     ) internal {
-        rentalStore.remove(rentingContract, lender, tenant);
+        rentalStore.remove(rentalContract, lender, tenant);
     }
 }
