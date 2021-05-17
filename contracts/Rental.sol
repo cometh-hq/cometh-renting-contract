@@ -35,29 +35,7 @@ contract Rental is Implementation, IRental, ReentrancyGuard {
         _;
     }
 
-    constructor(
-        address mustAddress,
-        address spaceshipsAddress,
-        address stakedSpaceShipsAddress,
-        address mustManagerAddress,
-        address newLender,
-        address newTenant,
-        uint256[] memory newNFTIds,
-        uint256 newEnd,
-        uint256 newPercentageForLender
-    ) public {
-        initialize(mustAddress,
-            spaceshipsAddress,
-            stakedSpaceShipsAddress,
-            mustManagerAddress,
-            newLender,
-            newTenant,
-            newNFTIds,
-            newEnd,
-            newPercentageForLender,
-            msg.sender
-        );
-    }
+    constructor() public {}
 
     function initialize(
         address mustAddress,

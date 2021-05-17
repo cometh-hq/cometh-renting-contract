@@ -49,17 +49,7 @@ contract('Rental', function(accounts) {
 
     const proxyFactory = await ProxyFactory.new()
 
-    const impl = await Rental.new(
-      must.address,
-      spaceships.address,
-      stakedSpaceShips.address,
-      game.address,
-      ZERO_ADDRESS,
-      ZERO_ADDRESS,
-      [],
-      0,
-      0
-    )
+    const impl = await Rental.new()
     offerStore = await OfferStore.new()
     rentalStore = await RentalStore.new()
     factory = await RentalManager.new(
