@@ -4,6 +4,7 @@ const ProxyFactory = artifacts.require("ProxyFactory");
 const OfferStore = artifacts.require("OfferStore");
 const RentalStore = artifacts.require("RentalStore");
 const Rental = artifacts.require("Rental");
+const Escrow = artifacts.require("Escrow");
 
 function requireEnv(name) {
   const v = process.env[name];
@@ -25,10 +26,12 @@ module.exports = async function (deployer, network) {
 
   const offerStore = await deployer.deploy(OfferStore)
   const rentalStore = await deployer.deploy(RentalStore)
+  const escrow = await deployer.deploy(Escrow, mustAddress, spaceshipsAddress)
 
   const rentalManager = await deployer.deploy(RentalManager, mustAddress, spaceshipsAddress, stakedSpaceShipsAddress, mustManagerAddress,
-    proxyFactory.address, implementation.address, offerStore.address, rentalStore.address);
+    proxyFactory.address, implementation.address, offerStore.address, rentalStore.address, escrow.address);
 
   await offerStore.updateModule(rentalManager.address)
   await rentalStore.updateModule(rentalManager.address)
+  await escrow.updateModule(rentalManager.address)
 };
