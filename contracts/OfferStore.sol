@@ -110,6 +110,11 @@ contract OfferStore is IOfferStore, Modulable {
         return _offerIds.contains(offerId);
     }
 
+    function offsetId(uint256 offset) external override returns (uint256) {
+        require(offset > currentId, "offset too small");
+        currentId = offset;
+    }
+
     function nftIds(uint256 offerId)
         external
         view

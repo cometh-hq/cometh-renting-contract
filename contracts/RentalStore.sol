@@ -87,7 +87,7 @@ contract RentalStore is IRentalStore, Modulable {
         }
         return result;
     }
-    
+
     function rentalsIdsReceivedOf(address account)
         external
         view
