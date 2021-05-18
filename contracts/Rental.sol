@@ -66,11 +66,8 @@ contract Rental is Implementation, IRental, ReentrancyGuard {
         must.approve(mustManagerAddress, 10000000 ether);
     }
 
-    function onERC721Received(address, address from, uint256, bytes calldata) override external returns(bytes4) {
+    function onERC721Received(address, address, uint256, bytes calldata) override external returns(bytes4) {
         require(msg.sender == spaceships || msg.sender == stakedSpaceShips, "invalid token");
-        if(msg.sender == spaceships) {
-            require (from == factory || from == stakedSpaceShips, "invalid from");
-        }
         return this.onERC721Received.selector;
     }
 

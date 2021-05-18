@@ -11,6 +11,7 @@ import "./IRentalManager.sol";
 import "./ProxyFactory.sol";
 import "./OfferStore.sol";
 import "./RentalStore.sol";
+import "./Escrow.sol";
 
 contract RentalManager is IRentalManager, Ownable {
     ProxyFactory public proxyFactory;
@@ -30,6 +31,7 @@ contract RentalManager is IRentalManager, Ownable {
 
     IOfferStore public offerStore;
     IRentalStore public rentalStore;
+    Escrow public escrow;
 
     constructor(
         address mustAddress,
@@ -39,7 +41,8 @@ contract RentalManager is IRentalManager, Ownable {
         ProxyFactory newProxyFactory,
         address newRentalImplementation,
         IOfferStore newOfferStore,
-        IRentalStore newRentalStore
+        IRentalStore newRentalStore,
+        Escrow newEscrow
     ) public {
         proxyFactory = newProxyFactory;
         rentalImplementation = newRentalImplementation;
@@ -51,6 +54,7 @@ contract RentalManager is IRentalManager, Ownable {
         feeReceiver = msg.sender;
         updateOfferStore(newOfferStore);
         updateRentalStore(newRentalStore);
+        escrow = Escrow(newEscrow);
     }
 
     function onERC721Received(
@@ -78,7 +82,7 @@ contract RentalManager is IRentalManager, Ownable {
         for(uint256 i = 0; i < nftIds.length; i++) {
             _transferSpaceShips(
                 msg.sender,
-                address(this),
+                address(escrow),
                 nftIds[i]
             );
         }
@@ -90,13 +94,12 @@ contract RentalManager is IRentalManager, Ownable {
         require(msg.sender == lender, "caller is not lender");
 
         uint256[] memory nftIds = offerStore.nftIds(offerId);
-        for(uint256 i = 0; i < nftIds.length; i++) {
-            _transferSpaceShips(
-                address(this),
-                lender,
-                nftIds[i]
-            );
-        }
+
+        escrow.transferSpaceShips(
+            lender,
+            nftIds
+        );
+
         _removeOffer(offerId);
         emit OfferRemoved(offerId, lender);
     }
@@ -107,7 +110,7 @@ contract RentalManager is IRentalManager, Ownable {
         require(offer.privateFor == address(0) || offer.privateFor == msg.sender, "invalid sender");
 
         uint256 leaveFee = offer.nftIds.length * _leaveFee;
-        _transferMust(msg.sender, address(this), leaveFee);
+        _transferMust(msg.sender, address(escrow), leaveFee);
 
         uint256 serviceFee = (offer.fee - leaveFee) * serviceFeePercentage / 100;
         if (serviceFee < serviceFeeMin) {
@@ -124,13 +127,11 @@ contract RentalManager is IRentalManager, Ownable {
             offer.percentageForLender
         );
 
-        for(uint256 i = 0; i < offer.nftIds.length; i++) {
-            _transferSpaceShips(
-                address(this),
-                rentalContract,
-                offer.nftIds[i]
-            );
-        }
+        escrow.transferSpaceShips(
+            rentalContract,
+            offer.nftIds
+        );
+
         _removeOffer(offerId);
         emit OfferAccepted(
             offerId,
@@ -145,10 +146,7 @@ contract RentalManager is IRentalManager, Ownable {
     function closeRental() override external {
         require(rentalStore.contains(msg.sender), "unknown rental");
         IRental rentalContract = IRental(msg.sender);
-        IERC20(must).transfer(
-            address(rentalContract),
-            rentalContract.nftIds().length * _leaveFee
-        );
+        escrow.transferMust(msg.sender, rentalContract.nftIds().length * _leaveFee);
         _removeRental(
             msg.sender,
             rentalContract.lender(),

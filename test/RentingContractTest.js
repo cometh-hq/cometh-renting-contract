@@ -7,6 +7,7 @@ const FakeGame = artifacts.require("FakeGame")
 const ProxyFactory = artifacts.require("ProxyFactory")
 const OfferStore = artifacts.require("OfferStore")
 const RentalStore = artifacts.require("RentalStore")
+const Escrow = artifacts.require("Escrow")
 
 const { assertRevertWith } = require('./utils');
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
@@ -21,6 +22,7 @@ contract('Rental', function(accounts) {
   let must;
   let offerStore;
   let rentalStore;
+  let escrow;
 
   const gameId = 1;
   const firstShip = 0
@@ -52,6 +54,7 @@ contract('Rental', function(accounts) {
     const impl = await Rental.new()
     offerStore = await OfferStore.new()
     rentalStore = await RentalStore.new()
+    escrow = await Escrow.new(must.address, spaceships.address)
     factory = await RentalManager.new(
       must.address,
       spaceships.address,
@@ -60,11 +63,13 @@ contract('Rental', function(accounts) {
       proxyFactory.address,
       impl.address,
       offerStore.address,
-      rentalStore.address
+      rentalStore.address,
+      escrow.address
     );
 
     await offerStore.updateModule(factory.address)
     await rentalStore.updateModule(factory.address)
+    await escrow.updateModule(factory.address)
     await must.transfer(bob, minFee, { from: admin });
   });
 
@@ -94,7 +99,7 @@ contract('Rental', function(accounts) {
       await rental.stake(secondShip, gameId, { from: bob })
       await rental.stake(thirdShip, gameId, { from: bob })
 
-      assert.equal(await must.balanceOf(factory.address), 3 * leaveFee);
+      assert.equal(await must.balanceOf(escrow.address), 3 * leaveFee);
     })
 
     it("make and acceptOffer with fixed fee", async function() {
